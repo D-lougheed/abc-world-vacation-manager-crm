@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -12,7 +13,8 @@ import {
   Upload,
   Tag,
   User,
-  Loader2
+  Loader2,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -191,6 +193,11 @@ const BookingDetailPage = () => {
           console.error("Error fetching booking files:", documentsError);
         }
         
+        // Format time strings for display
+        const formatTimeDisplay = (time: string | null): string => {
+          return time ? time : "No specific time";
+        };
+        
         // Construct the complete booking object
         const completeBooking = {
           id: bookingData.id,
@@ -202,7 +209,9 @@ const BookingDetailPage = () => {
           trip,
           serviceType: bookingData.service_type?.name || "Unknown Service",
           startDate: bookingData.start_date,
+          startTime: formatTimeDisplay(bookingData.start_time),
           endDate: bookingData.end_date,
+          endTime: formatTimeDisplay(bookingData.end_time),
           location: bookingData.location,
           cost: bookingData.cost,
           commissionRate: bookingData.commission_rate,
@@ -384,14 +393,32 @@ const BookingDetailPage = () => {
               </div>
 
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Date(s)</dt>
-                <dd className="flex items-center gap-2 mt-1">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div>{new Date(booking.startDate).toLocaleDateString()}</div>
+                <dt className="text-sm font-medium text-muted-foreground">Date & Time</dt>
+                <dd>
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <div className="font-medium">Start</div>
+                        <div>{new Date(booking.startDate).toLocaleDateString()}</div>
+                        <div className="text-sm flex items-center mt-1">
+                          <Clock className="h-3 w-3 text-muted-foreground mr-1" />
+                          <span className="text-muted-foreground">{booking.startTime}</span>
+                        </div>
+                      </div>
+                    </div>
+                  
                     {booking.endDate && (
-                      <div className="text-sm text-muted-foreground">
-                        to {new Date(booking.endDate).toLocaleDateString()}
+                      <div className="flex items-start gap-2 pt-2 border-t">
+                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <div className="font-medium">End</div>
+                          <div>{new Date(booking.endDate).toLocaleDateString()}</div>
+                          <div className="text-sm flex items-center mt-1">
+                            <Clock className="h-3 w-3 text-muted-foreground mr-1" />
+                            <span className="text-muted-foreground">{booking.endTime}</span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -57,7 +58,9 @@ const bookingSchema = z.object({
   vendor: z.string({ required_error: "Vendor is required" }),
   serviceType: z.string({ required_error: "Service type is required" }),
   startDate: z.date({ required_error: "Start date is required" }),
+  startTime: z.string().optional(),
   endDate: z.date().optional(),
+  endTime: z.string().optional(),
   location: z.string().min(1, { message: "Location is required" }),
   cost: z.number().positive({ message: "Cost must be a positive number" }),
   commissionRate: z.number().min(0, { message: "Commission rate cannot be negative" }),
@@ -80,6 +83,26 @@ interface SelectOption {
   label: string;
 }
 
+// Helper function to format time for display
+const formatTimeForDisplay = (timeString: string | null | undefined): string => {
+  if (!timeString) return "";
+  return timeString;
+};
+
+// Helper function to generate time options
+const generateTimeOptions = () => {
+  const options = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const hourStr = hour.toString().padStart(2, "0");
+      const minuteStr = minute.toString().padStart(2, "0");
+      const timeStr = `${hourStr}:${minuteStr}`;
+      options.push({ value: timeStr, label: timeStr });
+    }
+  }
+  return options;
+};
+
 const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -93,6 +116,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [tripOptions, setTripOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVendorCommissionRate, setSelectedVendorCommissionRate] = useState<number | null>(null);
+  const timeOptions = generateTimeOptions();
 
   // Default values for the form
   const defaultValues: Partial<BookingFormValues> = {
@@ -100,6 +124,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     vendor: "",
     serviceType: "",
     startDate: new Date(),
+    startTime: "",
+    endDate: undefined,
+    endTime: "",
     location: "",
     cost: 0,
     commissionRate: 10,
@@ -237,7 +264,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             vendor: booking.vendor_id,
             serviceType: booking.service_type_id,
             startDate: new Date(booking.start_date),
+            startTime: booking.start_time || "",
             endDate: booking.end_date ? new Date(booking.end_date) : undefined,
+            endTime: booking.end_time || "",
             location: booking.location,
             cost: booking.cost,
             commissionRate: booking.commission_rate,
@@ -360,7 +389,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             vendor_id: values.vendor,
             service_type_id: values.serviceType,
             start_date: values.startDate.toISOString().split('T')[0],
+            start_time: values.startTime || null,
             end_date: values.endDate ? values.endDate.toISOString().split('T')[0] : null,
+            end_time: values.endTime || null,
             location: values.location,
             cost: values.cost,
             commission_rate: values.commissionRate,
@@ -391,7 +422,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             vendor_id: values.vendor,
             service_type_id: values.serviceType,
             start_date: values.startDate.toISOString().split('T')[0],
+            start_time: values.startTime || null,
             end_date: values.endDate ? values.endDate.toISOString().split('T')[0] : null,
+            end_time: values.endTime || null,
             location: values.location,
             cost: values.cost,
             commission_rate: values.commissionRate,
@@ -622,89 +655,155 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                 />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Start Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarComponent
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) =>
-                                date < new Date("1900-01-01")
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Start Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date < new Date("1900-01-01")
+                                }
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   
-                  <FormField
-                    control={form.control}
-                    name="endDate"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>End Date (optional)</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
+                    <FormField
+                      control={form.control}
+                      name="startTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Time (optional)</FormLabel>
+                          <Select
+                            disabled={loading}
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                          >
                             <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
                             </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarComponent
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) =>
-                                date < form.getValues("startDate")
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                            <SelectContent>
+                              <SelectItem value="">No specific time</SelectItem>
+                              {timeOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="endDate"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>End Date (optional)</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date < form.getValues("startDate")
+                                }
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="endTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Time (optional)</FormLabel>
+                          <Select
+                            disabled={loading || !form.getValues("endDate")}
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No specific time</SelectItem>
+                              {timeOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
                 
                 <FormField

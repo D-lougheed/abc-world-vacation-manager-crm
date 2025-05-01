@@ -84,6 +84,7 @@ export type Database = {
           cost: number
           created_at: string
           end_date: string | null
+          end_time: string | null
           id: string
           is_completed: boolean
           location: string
@@ -91,6 +92,7 @@ export type Database = {
           rating: number | null
           service_type_id: string
           start_date: string
+          start_time: string | null
           trip_id: string | null
           updated_at: string
           vendor_id: string
@@ -104,6 +106,7 @@ export type Database = {
           cost: number
           created_at?: string
           end_date?: string | null
+          end_time?: string | null
           id?: string
           is_completed?: boolean
           location: string
@@ -111,6 +114,7 @@ export type Database = {
           rating?: number | null
           service_type_id: string
           start_date: string
+          start_time?: string | null
           trip_id?: string | null
           updated_at?: string
           vendor_id: string
@@ -124,6 +128,7 @@ export type Database = {
           cost?: number
           created_at?: string
           end_date?: string | null
+          end_time?: string | null
           id?: string
           is_completed?: boolean
           location?: string
@@ -131,6 +136,7 @@ export type Database = {
           rating?: number | null
           service_type_id?: string
           start_date?: string
+          start_time?: string | null
           trip_id?: string | null
           updated_at?: string
           vendor_id?: string
