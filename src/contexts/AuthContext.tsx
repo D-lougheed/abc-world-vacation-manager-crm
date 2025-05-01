@@ -11,7 +11,6 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -88,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: data.email,
           firstName: data.first_name,
           lastName: data.last_name,
-          role: data.role as UserRole,
+          role: data.role as UserRole, // Fixed by explicitly casting to UserRole
           isActive: data.is_active
         });
       }
@@ -119,41 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: "Login failed",
         description: error.message || "Invalid email or password",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signup = async (email: string, password: string, firstName: string, lastName: string) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account.",
-      });
-      
-      // Redirect to login or dashboard based on email confirmation settings
-      navigate('/login');
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      toast({
-        title: "Registration failed",
-        description: error.message || "There was an error creating your account",
         variant: "destructive"
       });
     } finally {
@@ -236,7 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading, 
         isAuthenticated: !!user, 
         login, 
-        signup, 
         logout, 
         resetPassword, 
         updatePassword, 
