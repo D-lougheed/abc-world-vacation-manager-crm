@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -375,10 +374,56 @@ const VendorDetailPage = () => {
         if (insertError) throw insertError;
         vendorId = newVendor.id;
         
+        // Save service types for this new vendor
+        if (serviceTypes.length > 0 && vendorId) {
+          const serviceTypeRelations = serviceTypes.map(st => ({
+            vendor_id: vendorId,
+            service_type_id: st.id
+          }));
+          
+          const { error: insertServiceTypeError } = await supabase
+            .from('vendor_service_types')
+            .insert(serviceTypeRelations);
+          
+          if (insertServiceTypeError) {
+            console.error('Error adding service types:', insertServiceTypeError);
+            toast({
+              title: "Warning",
+              description: `Error adding service types: ${insertServiceTypeError.message}`,
+              variant: "destructive"
+            });
+          }
+        }
+        
+        // Save tags for this new vendor
+        if (tags.length > 0 && vendorId) {
+          const tagRelations = tags.map(tag => ({
+            vendor_id: vendorId,
+            tag_id: tag.id
+          }));
+          
+          const { error: insertTagError } = await supabase
+            .from('vendor_tags')
+            .insert(tagRelations);
+          
+          if (insertTagError) {
+            console.error('Error adding tags:', insertTagError);
+            toast({
+              title: "Warning",
+              description: `Error adding tags: ${insertTagError.message}`,
+              variant: "destructive"
+            });
+          }
+        }
+        
         toast({
           title: "Vendor created",
           description: `${formData.name} has been added to your vendors`,
         });
+        
+        // Navigate to the new vendor's page in view mode
+        navigate(`/vendors/${vendorId}`);
+        return; // Important: Exit the function here to prevent further processing
       } else {
         // Update existing vendor
         const { error: updateError } = await supabase
@@ -392,12 +437,10 @@ const VendorDetailPage = () => {
           title: "Vendor updated",
           description: "Vendor information has been successfully updated",
         });
-      }
-      
-      // Save service types for this vendor
-      if (serviceTypes.length > 0 && vendorId) {
-        // First delete existing relationships
-        if (!isNewVendor) {
+        
+        // For existing vendors, handle service types
+        if (vendorId) {
+          // First delete existing relationships
           try {
             const { error: deleteError } = await supabase
               .from('vendor_service_types')
@@ -415,32 +458,32 @@ const VendorDetailPage = () => {
           } catch (error) {
             console.error('Exception deleting vendor service types:', error);
           }
+          
+          // Then insert new service type relationships
+          if (serviceTypes.length > 0) {
+            const serviceTypeRelations = serviceTypes.map(st => ({
+              vendor_id: vendorId,
+              service_type_id: st.id
+            }));
+            
+            const { error: insertError } = await supabase
+              .from('vendor_service_types')
+              .insert(serviceTypeRelations);
+            
+            if (insertError) {
+              console.error('Error adding service types:', insertError);
+              toast({
+                title: "Warning",
+                description: `Error adding service types: ${insertError.message}`,
+                variant: "destructive"
+              });
+            }
+          }
         }
         
-        // Insert new service type relationships
-        const serviceTypeRelations = serviceTypes.map(st => ({
-          vendor_id: vendorId,
-          service_type_id: st.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('vendor_service_types')
-          .insert(serviceTypeRelations);
-        
-        if (insertError) {
-          console.error('Error adding service types:', insertError);
-          toast({
-            title: "Warning",
-            description: `Error adding service types: ${insertError.message}`,
-            variant: "destructive"
-          });
-        }
-      }
-      
-      // Save tags for this vendor
-      if (tags.length > 0 && vendorId) {
-        // First delete existing relationships
-        if (!isNewVendor) {
+        // For existing vendors, handle tags
+        if (vendorId) {
+          // First delete existing relationships
           try {
             const { error: deleteError } = await supabase
               .from('vendor_tags')
@@ -458,35 +501,32 @@ const VendorDetailPage = () => {
           } catch (error) {
             console.error('Exception deleting vendor tags:', error);
           }
-        }
-        
-        // Insert new tag relationships
-        const tagRelations = tags.map(tag => ({
-          vendor_id: vendorId,
-          tag_id: tag.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('vendor_tags')
-          .insert(tagRelations);
-        
-        if (insertError) {
-          console.error('Error adding tags:', insertError);
-          toast({
-            title: "Warning",
-            description: `Error adding tags: ${insertError.message}`,
-            variant: "destructive"
-          });
+          
+          // Then insert new tag relationships
+          if (tags.length > 0) {
+            const tagRelations = tags.map(tag => ({
+              vendor_id: vendorId,
+              tag_id: tag.id
+            }));
+            
+            const { error: insertError } = await supabase
+              .from('vendor_tags')
+              .insert(tagRelations);
+            
+            if (insertError) {
+              console.error('Error adding tags:', insertError);
+              toast({
+                title: "Warning",
+                description: `Error adding tags: ${insertError.message}`,
+                variant: "destructive"
+              });
+            }
+          }
         }
       }
       
-      // Navigate to the vendor detail page if created new
-      if (isNewVendor && vendorId) {
-        navigate(`/vendors/${vendorId}`);
-      } else {
-        // Exit edit mode after saving
-        setIsEditMode(false);
-      }
+      // Exit edit mode after saving for existing vendors
+      setIsEditMode(false);
     } catch (error: any) {
       console.error('Error saving vendor:', error);
       toast({
