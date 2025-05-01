@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   FilePlus2,
   Users,
@@ -13,6 +13,7 @@ import {
   Upload,
   Tag,
   User,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -26,49 +27,218 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { BookingStatus, CommissionStatus, UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 const BookingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const [notes, setNotes] = useState("Client requested window seat near the front of the aircraft. Travel insurance has been purchased separately.");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState<any>(null);
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-  // In a real app, you would fetch booking data based on the ID
-  const booking = {
-    id: id || "1",
-    clients: [
-      { id: "1", name: "John Smith" },
-      { id: "2", name: "Jane Smith" }
-    ],
-    vendor: {
-      id: "1",
-      name: "Delta Airlines",
-      commissionRate: 8,
-      serviceTypes: ["Flight", "Transportation"]
-    },
-    trip: {
-      id: "1",
-      name: "European Adventure",
-      startDate: "2023-06-15",
-      endDate: "2023-06-25"
-    },
-    serviceType: "Flight",
-    startDate: "2023-06-15",
-    endDate: null,
-    location: "New York (JFK) to Paris (CDG)",
-    cost: 850,
-    commissionRate: 8,
-    commissionAmount: 68,
-    bookingStatus: BookingStatus.Confirmed,
-    isCompleted: false,
-    commissionStatus: CommissionStatus.Unreceived,
-    agent: {
-      id: "1",
-      name: "Michael Brown",
-      email: "michael@abctravel.com"
-    },
-    documents: [
-      { id: "1", name: "Flight Confirmation.pdf", uploadDate: "2023-05-01" },
-      { id: "2", name: "E-Tickets.pdf", uploadDate: "2023-05-10" }
-    ]
+  // Fetch booking data from Supabase
+  useEffect(() => {
+    const fetchBookingData = async () => {
+      try {
+        setLoading(true);
+        
+        if (!id) {
+          toast({
+            title: "Error",
+            description: "No booking ID provided",
+            variant: "destructive"
+          });
+          navigate("/bookings");
+          return;
+        }
+        
+        // Fetch booking data
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select('*, service_type:service_type_id(name)')
+          .eq('id', id)
+          .single();
+        
+        if (bookingError) throw bookingError;
+        if (!bookingData) {
+          toast({
+            title: "Booking not found",
+            description: "The booking you're looking for doesn't exist",
+            variant: "destructive"
+          });
+          navigate("/bookings");
+          return;
+        }
+        
+        // Set initial notes if available
+        if (bookingData.notes) {
+          setNotes(bookingData.notes);
+        }
+        
+        // Fetch associated clients
+        const { data: clientRelations, error: clientRelationsError } = await supabase
+          .from('booking_clients')
+          .select('client_id')
+          .eq('booking_id', id);
+        
+        if (clientRelationsError) throw clientRelationsError;
+        
+        let clients = [];
+        if (clientRelations && clientRelations.length > 0) {
+          const clientIds = clientRelations.map(relation => relation.client_id);
+          const { data: clientsData, error: clientsError } = await supabase
+            .from('clients')
+            .select('id, first_name, last_name')
+            .in('id', clientIds);
+          
+          if (clientsError) throw clientsError;
+          clients = clientsData || [];
+        }
+        
+        // Fetch vendor data
+        let vendor = { name: "Unknown Vendor", commissionRate: 0, serviceTypes: [] };
+        if (bookingData.vendor_id) {
+          const { data: vendorData, error: vendorError } = await supabase
+            .from('vendors')
+            .select('id, name, commission_rate')
+            .eq('id', bookingData.vendor_id)
+            .single();
+          
+          if (vendorError) {
+            console.error("Error fetching vendor:", vendorError);
+          } else if (vendorData) {
+            vendor = {
+              id: vendorData.id,
+              name: vendorData.name,
+              commissionRate: vendorData.commission_rate,
+              serviceTypes: []
+            };
+            
+            // Fetch vendor service types
+            const { data: vendorServiceTypes, error: vendorServiceTypesError } = await supabase
+              .from('vendor_service_types')
+              .select('service_type_id')
+              .eq('vendor_id', vendorData.id);
+            
+            if (!vendorServiceTypesError && vendorServiceTypes) {
+              const serviceTypeIds = vendorServiceTypes.map(vst => vst.service_type_id);
+              const { data: serviceTypesData, error: serviceTypesError } = await supabase
+                .from('service_types')
+                .select('name')
+                .in('id', serviceTypeIds);
+              
+              if (!serviceTypesError && serviceTypesData) {
+                vendor.serviceTypes = serviceTypesData.map(st => st.name);
+              }
+            }
+          }
+        }
+        
+        // Fetch trip data if exists
+        let trip = null;
+        if (bookingData.trip_id) {
+          const { data: tripData, error: tripError } = await supabase
+            .from('trips')
+            .select('id, name, start_date, end_date')
+            .eq('id', bookingData.trip_id)
+            .single();
+          
+          if (!tripError && tripData) {
+            trip = tripData;
+          }
+        }
+        
+        // Fetch agent data
+        let agent = { name: "Unknown Agent", email: "" };
+        if (bookingData.agent_id) {
+          const { data: agentData, error: agentError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', bookingData.agent_id)
+            .single();
+          
+          if (!agentError && agentData) {
+            agent = {
+              id: bookingData.agent_id,
+              name: `${agentData.first_name} ${agentData.last_name}`,
+              email: agentData.email
+            };
+          }
+        }
+        
+        // Fetch documents/files
+        const { data: documents, error: documentsError } = await supabase
+          .from('booking_files')
+          .select('id, file_name, file_path, uploaded_at')
+          .eq('booking_id', id);
+        
+        if (documentsError) {
+          console.error("Error fetching booking files:", documentsError);
+        }
+        
+        // Construct the complete booking object
+        const completeBooking = {
+          id: bookingData.id,
+          clients: clients.map(client => ({ 
+            id: client.id, 
+            name: `${client.first_name} ${client.last_name}` 
+          })),
+          vendor,
+          trip,
+          serviceType: bookingData.service_type?.name || "Unknown Service",
+          startDate: bookingData.start_date,
+          endDate: bookingData.end_date,
+          location: bookingData.location,
+          cost: bookingData.cost,
+          commissionRate: bookingData.commission_rate,
+          commissionAmount: bookingData.commission_amount,
+          bookingStatus: bookingData.booking_status as BookingStatus,
+          isCompleted: bookingData.is_completed,
+          commissionStatus: bookingData.commission_status as CommissionStatus,
+          agent,
+          documents: documents || [],
+          notes: bookingData.notes
+        };
+        
+        setBooking(completeBooking);
+      } catch (error: any) {
+        console.error("Error fetching booking details:", error);
+        toast({
+          title: "Error loading booking details",
+          description: error.message || "There was an error loading the booking details.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookingData();
+  }, [id, navigate, toast]);
+
+  // Function to update notes
+  const updateNotes = async () => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ notes })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Notes updated",
+        description: "Booking notes have been updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to update notes",
+        description: error.message || "There was an error updating the notes.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Function to get booking status badge styling
@@ -101,6 +271,25 @@ const BookingDetailPage = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p>Loading booking details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p>Booking not found.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -123,7 +312,7 @@ const BookingDetailPage = () => {
         </div>
         
         <div className="flex gap-2">
-          <Button>
+          <Button onClick={() => navigate(`/bookings/${id}/edit`)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit Booking
           </Button>
@@ -141,12 +330,16 @@ const BookingDetailPage = () => {
                 <dt className="text-sm font-medium text-muted-foreground mb-2">Client(s)</dt>
                 <dd>
                   <div className="space-y-2">
-                    {booking.clients.map((client) => (
-                      <div key={client.id} className="flex items-center rounded-md border px-3 py-2">
-                        <Users className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>{client.name}</span>
-                      </div>
-                    ))}
+                    {booking.clients.length > 0 ? (
+                      booking.clients.map((client) => (
+                        <div key={client.id} className="flex items-center rounded-md border px-3 py-2">
+                          <Users className="h-4 w-4 text-muted-foreground mr-2" />
+                          <span>{client.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No clients assigned</div>
+                    )}
                   </div>
                 </dd>
               </div>
@@ -282,6 +475,7 @@ const BookingDetailPage = () => {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="min-h-[150px]"
+                onBlur={updateNotes}
               />
             </div>
 
@@ -294,17 +488,23 @@ const BookingDetailPage = () => {
                 </Button>
               </div>
               <div className="space-y-2">
-                {booking.documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span>{doc.name}</span>
+                {booking.documents.length > 0 ? (
+                  booking.documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>{doc.file_name}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(doc.uploaded_at).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(doc.uploadDate).toLocaleDateString()}
-                    </span>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No documents uploaded yet.
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
