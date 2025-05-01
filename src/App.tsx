@@ -27,13 +27,18 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -43,23 +48,25 @@ const App = () => (
             
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
-            <Route element={<ProtectedRoute><SidebarProvider><AppLayout /></SidebarProvider></ProtectedRoute>}>
+            <Route 
+              element={
+                <ProtectedRoute>
+                  <SidebarProvider>
+                    <AppLayout />
+                  </SidebarProvider>
+                </ProtectedRoute>
+              }
+            >
               <Route path="/dashboard" element={<DashboardPage />} />
-              
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/clients/:id" element={<ClientDetailPage />} />
-              
               <Route path="/vendors" element={<VendorsPage />} />
               <Route path="/vendors/:id" element={<VendorDetailPage />} />
-              
               <Route path="/trips" element={<TripsPage />} />
               <Route path="/trips/:id" element={<TripDetailPage />} />
-              
               <Route path="/bookings" element={<BookingsPage />} />
               <Route path="/bookings/:id" element={<BookingDetailPage />} />
-              
               <Route path="/commissions" element={<CommissionsPage />} />
-              
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/agents" element={<AgentsPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
@@ -68,6 +75,8 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <Toaster />
+          <Sonner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

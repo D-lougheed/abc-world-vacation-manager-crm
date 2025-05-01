@@ -31,11 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (session) {
           setSession(session);
           setSupaUser(session.user);
-          await fetchUserProfile(session.user.id);
+          // Use setTimeout to avoid potential deadlock with Supabase auth
+          setTimeout(() => {
+            fetchUserProfile(session.user.id);
+          }, 0);
         } else {
           setSession(null);
           setSupaUser(null);
@@ -83,20 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data) {
         // Convert string role to UserRole enum
-        let roleValue: UserRole;
-        
-        switch (data.role) {
-          case 'SuperAdmin':
-            roleValue = UserRole.SuperAdmin;
-            break;
-          case 'Admin':
-            roleValue = UserRole.Admin;
-            break;
-          case 'Agent':
-          default:
-            roleValue = UserRole.Agent;
-            break;
-        }
+        const roleValue = data.role as UserRole;
         
         setUser({
           id: data.id,
@@ -107,8 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isActive: data.is_active
         });
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      setLoading(false);
     }
   };
 
@@ -206,7 +198,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkUserAccess = (requiredRole: UserRole): boolean => {
     if (!user) return false;
-    return user.role <= requiredRole;
+    
+    // For string-based enum, we need to check differently
+    switch (user.role) {
+      case UserRole.SuperAdmin:
+        return true; // SuperAdmin has access to everything
+      case UserRole.Admin:
+        return requiredRole !== UserRole.SuperAdmin; // Admin has access to Admin and Agent roles
+      case UserRole.Agent:
+        return requiredRole === UserRole.Agent; // Agent only has access to Agent role
+      default:
+        return false;
+    }
   };
 
   return (
