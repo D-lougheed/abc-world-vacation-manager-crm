@@ -35,6 +35,7 @@ interface Booking {
   service_types: {
     name: string;
   };
+  rating?: number;
 }
 
 interface Document {
@@ -55,6 +56,7 @@ interface UseVendorDataReturn {
   availableTags: Tag[];
   bookings: Booking[];
   documents: Document[];
+  vendorRating: number;
 }
 
 export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean): UseVendorDataReturn => {
@@ -78,6 +80,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [vendorRating, setVendorRating] = useState<number>(0);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -124,6 +127,9 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
               priceRange: vendorData.price_range,
               notes: vendorData.notes || ""
             });
+            
+            // Store vendor rating
+            setVendorRating(vendorData.rating || 0);
             
             // Fetch service types for this vendor
             const { data: vendorServiceTypes, error: vendorServiceTypesError } = await supabase
@@ -178,6 +184,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
                 cost, 
                 commission_amount, 
                 booking_status, 
+                rating,
                 location,
                 service_types:service_type_id(name)
               `)
@@ -224,6 +231,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
     availableServiceTypes,
     availableTags,
     bookings,
-    documents
+    documents,
+    vendorRating
   };
 };

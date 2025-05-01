@@ -137,96 +137,88 @@ export const useVendorActions = (
         
         if (updateError) throw updateError;
         
-        toast({
-          title: "Vendor updated",
-          description: "Vendor information has been successfully updated",
-        });
-        
         // For existing vendors, handle service types
         if (finalVendorId) {
           // First delete existing relationships
-          try {
-            const { error: deleteError } = await supabase
-              .from('vendor_service_types')
-              .delete()
-              .eq('vendor_id', finalVendorId);
-            
-            if (deleteError) {
-              console.error('Error deleting vendor service types:', deleteError);
-              toast({
-                title: "Warning",
-                description: `Error removing existing service types: ${deleteError.message}`,
-                variant: "destructive"
-              });
-            }
-          } catch (error) {
-            console.error('Exception deleting vendor service types:', error);
+          const { error: deleteSTError } = await supabase
+            .from('vendor_service_types')
+            .delete()
+            .eq('vendor_id', finalVendorId);
+          
+          if (deleteSTError) {
+            console.error('Error deleting vendor service types:', deleteSTError);
+            toast({
+              title: "Warning",
+              description: `Error removing existing service types: ${deleteSTError.message}`,
+              variant: "destructive"
+            });
           }
           
-          // Then insert new service type relationships
+          // Only insert if there are service types to add
           if (serviceTypes.length > 0) {
+            // Then insert new service type relationships
             const serviceTypeRelations = serviceTypes.map(st => ({
               vendor_id: finalVendorId,
               service_type_id: st.id
             }));
             
-            const { error: insertError } = await supabase
+            const { error: insertSTError } = await supabase
               .from('vendor_service_types')
               .insert(serviceTypeRelations);
             
-            if (insertError) {
-              console.error('Error adding service types:', insertError);
+            if (insertSTError) {
+              console.error('Error adding service types:', insertSTError);
               toast({
                 title: "Warning",
-                description: `Error adding service types: ${insertError.message}`,
+                description: `Error adding service types: ${insertSTError.message}`,
+                variant: "destructive"
+              });
+            }
+          }
+          
+          // For existing vendors, handle tags
+          // First delete existing relationships
+          const { error: deleteTagError } = await supabase
+            .from('vendor_tags')
+            .delete()
+            .eq('vendor_id', finalVendorId);
+          
+          if (deleteTagError) {
+            console.error('Error deleting vendor tags:', deleteTagError);
+            toast({
+              title: "Warning",
+              description: `Error removing existing tags: ${deleteTagError.message}`,
+              variant: "destructive"
+            });
+          }
+          
+          // Only insert if there are tags to add
+          if (tags.length > 0) {
+            // Then insert new tag relationships
+            const tagRelations = tags.map(tag => ({
+              vendor_id: finalVendorId,
+              tag_id: tag.id
+            }));
+            
+            const { error: insertTagError } = await supabase
+              .from('vendor_tags')
+              .insert(tagRelations);
+            
+            if (insertTagError) {
+              console.error('Error adding tags:', insertTagError);
+              toast({
+                title: "Warning",
+                description: `Error adding tags: ${insertTagError.message}`,
                 variant: "destructive"
               });
             }
           }
         }
         
-        // For existing vendors, handle tags
-        if (finalVendorId) {
-          // First delete existing relationships
-          try {
-            const { error: deleteError } = await supabase
-              .from('vendor_tags')
-              .delete()
-              .eq('vendor_id', finalVendorId);
-            
-            if (deleteError) {
-              console.error('Error deleting vendor tags:', deleteError);
-              toast({
-                title: "Warning",
-                description: `Error removing existing tags: ${deleteError.message}`,
-                variant: "destructive"
-              });
-            }
-          } catch (error) {
-            console.error('Exception deleting vendor tags:', error);
-          }
-          
-          // Then insert new tag relationships
-          if (tags.length > 0) {
-            const tagRelations = tags.map(tag => ({
-              vendor_id: finalVendorId,
-              tag_id: tag.id
-            }));
-            
-            const { error: insertError } = await supabase
-              .from('vendor_tags')
-              .insert(tagRelations);
-            
-            if (insertError) {
-              console.error('Error adding tags:', insertError);
-              toast({
-                title: "Warning",
-                description: `Error adding tags: ${insertError.message}`,
-                variant: "destructive"
-              });
-            }
-          }
-        }
+        toast({
+          title: "Vendor updated",
+          description: "Vendor information has been successfully updated",
+        });
       }
     } catch (error: any) {
       console.error('Error saving vendor:', error);

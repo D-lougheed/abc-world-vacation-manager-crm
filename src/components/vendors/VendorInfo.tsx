@@ -39,23 +39,25 @@ const VendorInfo = ({
   };
 
   // Function to render rating as stars
-  const renderRating = (rating: number) => {
+  const renderRating = (rating: number = 0) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
 
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={i} className="h-4 w-4 text-yellow-400 fill-yellow-400" />);
-    }
-
-    if (hasHalfStar) {
-      stars.push(<Star key="half" className="h-4 w-4 text-yellow-400" />);
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(<Star key={i} className="h-4 w-4 text-yellow-400 fill-yellow-400" />);
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(<Star key={i} className="h-4 w-4 text-yellow-400" />);
+      } else {
+        stars.push(<Star key={i} className="h-4 w-4 text-muted-foreground/30" />);
+      }
     }
 
     return (
       <div className="flex items-center">
         <div className="flex mr-1">{stars}</div>
-        <span>({rating})</span>
+        <span>({rating.toFixed(1)})</span>
       </div>
     );
   };
@@ -72,6 +74,13 @@ const VendorInfo = ({
           <p>{renderPriceRange(priceRange)}</p>
         </div>
       </div>
+      
+      {rating !== undefined && rating > 0 && (
+        <div className="pt-2 border-t">
+          <h3 className="font-medium text-sm text-muted-foreground">Rating</h3>
+          {renderRating(rating)}
+        </div>
+      )}
       
       <div className="pt-2 border-t">
         <div className="flex items-center gap-2 mb-3">

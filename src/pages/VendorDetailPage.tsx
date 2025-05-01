@@ -6,7 +6,8 @@ import {
   Edit,
   CalendarCheck,
   Save,
-  Trash2
+  Trash2,
+  Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,7 +59,8 @@ const VendorDetailPage = () => {
     tags,
     setTags,
     bookings,
-    documents
+    documents,
+    vendorRating
   } = useVendorData(id, isNewVendor);
   
   const {
@@ -75,6 +77,18 @@ const VendorDetailPage = () => {
     if (!isNewVendor) {
       setIsEditMode(false);
     }
+  };
+
+  // Render the vendor's rating if available
+  const renderRating = () => {
+    if (!vendorRating || vendorRating === 0) return null;
+    
+    return (
+      <div className="flex items-center gap-1 text-sm">
+        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+        <span>{vendorRating?.toFixed(1)}</span>
+      </div>
+    );
   };
 
   if (loading) {
@@ -96,7 +110,10 @@ const VendorDetailPage = () => {
             <Briefcase className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">{isNewVendor ? "New Vendor" : formData.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{isNewVendor ? "New Vendor" : formData.name}</h1>
+              {renderRating()}
+            </div>
             <p className="text-sm text-muted-foreground">
               {isNewVendor ? "Create a new vendor" : `Contact: ${formData.contactPerson}`}
             </p>
@@ -170,6 +187,7 @@ const VendorDetailPage = () => {
                 serviceTypes={serviceTypes}
                 tags={tags}
                 notes={formData.notes}
+                rating={vendorRating}
               />
             )}
           </CardContent>

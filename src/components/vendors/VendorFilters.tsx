@@ -79,7 +79,7 @@ const VendorFilters = ({
   };
   
   const clearFilters = () => {
-    const resetFilters = {
+    const resetFilters: VendorFilters = {
       serviceTypes: [],
       priceRange: [1, 5],
       commissionRange: [0, 100],
@@ -163,7 +163,13 @@ const VendorFilters = ({
               min={1} 
               max={5} 
               step={1}
-              onValueChange={(value) => handleFilterChange({ priceRange: value as [number, number] })}
+              onValueChange={(value) => {
+                // Ensure we always have exactly two values
+                const typedValue: [number, number] = value.length === 2 
+                  ? [value[0], value[1]] 
+                  : [value[0], value[0]];
+                handleFilterChange({ priceRange: typedValue });
+              }}
               className="py-4"
             />
           </div>
@@ -180,7 +186,13 @@ const VendorFilters = ({
               min={0} 
               max={100} 
               step={5}
-              onValueChange={(value) => handleFilterChange({ commissionRange: value as [number, number] })}
+              onValueChange={(value) => {
+                // Ensure we always have exactly two values
+                const typedValue: [number, number] = value.length === 2 
+                  ? [value[0], value[1]] 
+                  : [value[0], value[0]];
+                handleFilterChange({ commissionRange: typedValue });
+              }}
               className="py-4"
             />
           </div>
