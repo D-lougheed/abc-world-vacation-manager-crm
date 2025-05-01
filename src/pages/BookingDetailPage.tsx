@@ -53,6 +53,17 @@ const BookingDetailPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Function to convert time from 24-hour to 12-hour format
+  const convertTo12HourFormat = (time24: string | null): string => {
+    if (!time24) return "No specific time";
+    
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
+    
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
   // Fetch booking data from Supabase
   useEffect(() => {
     const fetchBookingData = async () => {
@@ -195,7 +206,8 @@ const BookingDetailPage = () => {
         
         // Format time strings for display
         const formatTimeDisplay = (time: string | null): string => {
-          return time ? time : "No specific time";
+          if (!time) return "No specific time";
+          return convertTo12HourFormat(time);
         };
         
         // Construct the complete booking object
