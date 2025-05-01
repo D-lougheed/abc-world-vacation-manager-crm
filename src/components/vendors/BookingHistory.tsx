@@ -1,5 +1,5 @@
 
-import { DollarSign } from "lucide-react";
+import { DollarSign, Calendar } from "lucide-react";
 
 interface Booking {
   id: string;

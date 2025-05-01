@@ -14,6 +14,7 @@ import {
   Loader2,
   MapPin,
   Save,
+  Plus
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -601,8 +602,15 @@ const TripDetailPage = () => {
         
         <TabsContent value="bookings" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Trip Bookings</CardTitle>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/bookings/new?trip=${trip.id}`)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Booking
+              </Button>
             </CardHeader>
             <CardContent>
               {bookings.length > 0 ? (
@@ -643,6 +651,7 @@ const TripDetailPage = () => {
                     className="mt-4"
                     onClick={() => navigate(`/bookings/new?trip=${trip.id}`)}
                   >
+                    <Plus className="h-4 w-4 mr-2" />
                     Create a Booking
                   </Button>
                 </div>
