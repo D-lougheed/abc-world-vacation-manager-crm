@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   User,
@@ -28,87 +28,71 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AgentsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Dummy data
-  const agents = [
-    { 
-      id: "1", 
-      firstName: "Michael", 
-      lastName: "Brown", 
-      email: "michael@abctravel.com", 
-      role: UserRole.SuperAdmin, 
-      isActive: true,
-      bookingsCount: 45,
-      lastActive: "2023-05-15T10:30:00",
-    },
-    { 
-      id: "2", 
-      firstName: "Sarah", 
-      lastName: "Johnson", 
-      email: "sarah@abctravel.com", 
-      role: UserRole.Admin, 
-      isActive: true,
-      bookingsCount: 38,
-      lastActive: "2023-05-14T16:45:00",
-    },
-    { 
-      id: "3", 
-      firstName: "David", 
-      lastName: "Wilson", 
-      email: "david@abctravel.com", 
-      role: UserRole.Agent, 
-      isActive: true,
-      bookingsCount: 26,
-      lastActive: "2023-05-15T09:15:00",
-    },
-    { 
-      id: "4", 
-      firstName: "Jennifer", 
-      lastName: "Lee", 
-      email: "jennifer@abctravel.com", 
-      role: UserRole.Agent, 
-      isActive: true,
-      bookingsCount: 31,
-      lastActive: "2023-05-15T11:20:00",
-    },
-    { 
-      id: "5", 
-      firstName: "Robert", 
-      lastName: "Taylor", 
-      email: "robert@abctravel.com", 
-      role: UserRole.Agent, 
-      isActive: false,
-      bookingsCount: 12,
-      lastActive: "2023-04-28T14:30:00",
-    },
-  ];
+  // Fetch agents from Supabase
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('last_name', { ascending: true });
+        
+        if (error) {
+          throw error;
+        }
+        
+        setAgents(data || []);
+      } catch (error: any) {
+        console.error('Error fetching agents:', error);
+        toast({
+          title: "Failed to load agents",
+          description: error.message || "There was an error loading the agent data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAgents();
+  }, [toast]);
 
   // Filter agents based on search term
   const filteredAgents = agents.filter((agent) => {
-    const fullName = `${agent.firstName} ${agent.lastName}`.toLowerCase();
-    const email = agent.email.toLowerCase();
+    if (!agent) return false;
+    const fullName = `${agent.first_name || ''} ${agent.last_name || ''}`.toLowerCase();
+    const email = (agent.email || '').toLowerCase();
     return fullName.includes(searchTerm.toLowerCase()) || email.includes(searchTerm.toLowerCase());
   });
 
   // Function to get role label and badge style
-  const getRoleBadge = (role: UserRole) => {
+  const getRoleBadge = (role: string) => {
     switch (role) {
-      case UserRole.SuperAdmin:
+      case "SuperAdmin":
         return {
           label: "Super Admin",
           style: "bg-purple-100 text-purple-800 border-purple-200"
         };
-      case UserRole.Admin:
+      case "Admin":
         return {
           label: "Admin",
           style: "bg-blue-100 text-blue-800 border-blue-200"
         };
-      case UserRole.Agent:
+      case "Agent":
         return {
           label: "Agent",
           style: "bg-green-100 text-green-800 border-green-200"
@@ -121,8 +105,38 @@ const AgentsPage = () => {
     }
   };
 
-  // Get current user's role (simulated)
-  const currentUserRole = UserRole.SuperAdmin;
+  // Helper to convert string role to UserRole enum
+  const getEnumRole = (roleString: string): UserRole => {
+    switch (roleString) {
+      case "SuperAdmin": return UserRole.SuperAdmin;
+      case "Admin": return UserRole.Admin;
+      case "Agent": 
+      default: return UserRole.Agent;
+    }
+  };
+
+  // Handle sending password reset email
+  const handleSendResetEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Password reset email sent",
+        description: "The user will receive instructions to reset their password."
+      });
+    } catch (error: any) {
+      console.error('Error sending reset email:', error);
+      toast({
+        title: "Failed to send reset email",
+        description: error.message || "There was an error sending the reset email",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
@@ -161,66 +175,74 @@ const AgentsPage = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Bookings</TableHead>
-                    <TableHead>Last Active</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAgents.map((agent) => {
-                    const roleBadge = getRoleBadge(agent.role);
-                    // Only allow editing if current user role is higher (lower number) than the agent's role
-                    const canManage = currentUserRole < agent.role;
-                    
-                    return (
-                      <TableRow key={agent.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <div className="rounded-full bg-muted p-1">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <span>
-                              {agent.firstName} {agent.lastName}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{agent.email}</TableCell>
-                        <TableCell>
-                          <Badge className={roleBadge.style} variant="outline">
-                            {agent.role === UserRole.SuperAdmin && <Shield className="mr-1 h-3 w-3" />}
-                            {roleBadge.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={agent.isActive ? "default" : "secondary"} className="capitalize">
-                            {agent.isActive ? (
-                              <Check className="mr-1 h-3 w-3" />
-                            ) : (
-                              <X className="mr-1 h-3 w-3" />
-                            )}
-                            {agent.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{agent.bookingsCount}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(agent.lastActive).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="icon" disabled={!canManage}>
-                              <UserCog className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <MailPlus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {filteredAgents.length === 0 && (
+                  {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Loading agents...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredAgents.length > 0 ? (
+                    filteredAgents.map((agent) => {
+                      if (!agent) return null;
+                      const roleBadge = getRoleBadge(agent.role || "Agent");
+                      const agentRole = getEnumRole(agent.role || "Agent");
+                      
+                      // Only allow editing if current user role is higher (lower number) than the agent's role
+                      const canManage = user && user.role < agentRole;
+                      
+                      return (
+                        <TableRow key={agent.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <div className="rounded-full bg-muted p-1">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <span>
+                                {agent.first_name} {agent.last_name}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{agent.email}</TableCell>
+                          <TableCell>
+                            <Badge className={roleBadge.style} variant="outline">
+                              {agent.role === "SuperAdmin" && <Shield className="mr-1 h-3 w-3" />}
+                              {roleBadge.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={agent.is_active ? "default" : "secondary"} className="capitalize">
+                              {agent.is_active ? (
+                                <Check className="mr-1 h-3 w-3" />
+                              ) : (
+                                <X className="mr-1 h-3 w-3" />
+                              )}
+                              {agent.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="icon" disabled={!canManage}>
+                                <UserCog className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleSendResetEmail(agent.email)}
+                              >
+                                <MailPlus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         No agents found. Try a different search term or add a new agent.
                       </TableCell>
                     </TableRow>
