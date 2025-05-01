@@ -1,10 +1,7 @@
 
-import { useState } from "react";
 import BookingForm from "@/components/forms/BookingForm";
 
 const NewBookingPage = () => {
-  const [loading] = useState(false);
-  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

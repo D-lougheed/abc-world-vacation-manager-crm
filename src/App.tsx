@@ -18,6 +18,7 @@ import TripsPage from "./pages/TripsPage";
 import TripDetailPage from "./pages/TripDetailPage";
 import BookingsPage from "./pages/BookingsPage";
 import BookingDetailPage from "./pages/BookingDetailPage";
+import NewBookingPage from "./pages/NewBookingPage";
 import CommissionsPage from "./pages/CommissionsPage";
 import AdminPage from "./pages/AdminPage";
 import AgentsPage from "./pages/AgentsPage";
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/trips" element={<TripsPage />} />
               <Route path="/trips/:id" element={<TripDetailPage />} />
               <Route path="/bookings" element={<BookingsPage />} />
+              <Route path="/bookings/new" element={<NewBookingPage />} />
               <Route path="/bookings/:id" element={<BookingDetailPage />} />
               <Route path="/commissions" element={<CommissionsPage />} />
               <Route path="/admin" element={<AdminPage />} />
