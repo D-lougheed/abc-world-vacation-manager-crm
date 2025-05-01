@@ -75,7 +75,12 @@ const ClientsPage = () => {
           if (bookingsError) console.error('Error fetching booking count:', bookingsError);
           
           return {
-            ...client,
+            id: client.id,
+            firstName: client.first_name,
+            lastName: client.last_name,
+            dateCreated: client.date_created,
+            lastUpdated: client.last_updated,
+            notes: client.notes,
             tripsCount: tripsCount || 0,
             bookingsCount: bookingsCount || 0
           };

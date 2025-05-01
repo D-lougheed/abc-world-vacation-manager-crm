@@ -35,9 +35,21 @@ import { UserRole, Vendor } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-interface VendorWithDetails extends Vendor {
+// Modified interface that doesn't extend Vendor to avoid type conflicts
+interface VendorWithDetails {
+  id: string;
+  name: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  serviceArea: string;
+  commissionRate: number;
+  priceRange: number;
+  rating: number;
   serviceTypes: string[];
   tags: string[];
+  notes?: string;
 }
 
 const VendorsPage = () => {
