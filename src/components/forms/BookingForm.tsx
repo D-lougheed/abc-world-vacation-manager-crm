@@ -51,15 +51,26 @@ import { MultiSelect } from "./MultiSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 
+// Time validation regex - format HH:MM (24-hour)
+const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+
 // Schema for form validation
 const bookingSchema = z.object({
   clients: z.array(z.string()).min(1, { message: "At least one client must be selected" }),
   vendor: z.string({ required_error: "Vendor is required" }),
   serviceType: z.string({ required_error: "Service type is required" }),
   startDate: z.date({ required_error: "Start date is required" }),
-  startTime: z.string().optional(),
+  startTime: z.string()
+    .refine(val => val === "" || timeRegex.test(val), {
+      message: "Time must be in format HH:MM (24-hour)",
+    })
+    .optional(),
   endDate: z.date().optional(),
-  endTime: z.string().optional(),
+  endTime: z.string()
+    .refine(val => val === "" || timeRegex.test(val), {
+      message: "Time must be in format HH:MM (24-hour)",
+    })
+    .optional(),
   location: z.string().min(1, { message: "Location is required" }),
   cost: z.number().positive({ message: "Cost must be a positive number" }),
   commissionRate: z.number().min(0, { message: "Commission rate cannot be negative" }),
@@ -704,25 +715,19 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Start Time (optional)</FormLabel>
-                          <Select
-                            disabled={loading}
-                            onValueChange={field.onChange}
-                            value={field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select time" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No specific time</SelectItem>
-                              {timeOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <div className="relative">
+                              <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input 
+                                placeholder="HH:MM (e.g. 14:30)" 
+                                className="pl-9" 
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>
+                            Use 24-hour format (e.g., 14:30)
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -779,25 +784,20 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>End Time (optional)</FormLabel>
-                          <Select
-                            disabled={loading || !form.getValues("endDate")}
-                            onValueChange={field.onChange}
-                            value={field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select time" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No specific time</SelectItem>
-                              {timeOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <div className="relative">
+                              <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input 
+                                placeholder="HH:MM (e.g. 16:30)" 
+                                className="pl-9" 
+                                disabled={!form.getValues("endDate")}
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>
+                            Use 24-hour format (e.g., 16:30)
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
