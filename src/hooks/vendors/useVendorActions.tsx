@@ -176,30 +176,23 @@ export const useVendorActions = (
             }
           }
           
-          // For existing vendors, handle tags - FIX HERE
-          // First delete existing relationships
-          const { error: deleteTagError } = await supabase
-            .from('vendor_tags')
-            .delete()
-            .eq('vendor_id', finalVendorId);
-          
-          if (deleteTagError) {
-            console.error('Error deleting vendor tags:', deleteTagError);
-            toast({
-              title: "Warning",
-              description: `Error removing existing tags: ${deleteTagError.message}`,
-              variant: "destructive"
-            });
-          } else {
-            // Only insert if there are tags to add and we successfully deleted the old ones
+          // Handle tags - ensure we delete old ones first completely
+          try {
+            // First delete all existing tag relationships
+            await supabase
+              .from('vendor_tags')
+              .delete()
+              .eq('vendor_id', finalVendorId);
+            
+            // Then add the new tags if there are any
             if (tags.length > 0) {
-              // Create unique tag relations to avoid constraint violations
+              // Create tag relations with the vendor id
               const tagRelations = tags.map(tag => ({
                 vendor_id: finalVendorId,
                 tag_id: tag.id
               }));
               
-              // Insert all tag relations at once
+              // Insert all tag relations in a separate transaction
               const { error: insertTagError } = await supabase
                 .from('vendor_tags')
                 .insert(tagRelations);
@@ -213,6 +206,13 @@ export const useVendorActions = (
                 });
               }
             }
+          } catch (tagError: any) {
+            console.error('Error managing vendor tags:', tagError);
+            toast({
+              title: "Warning",
+              description: `Error managing vendor tags: ${tagError.message}`,
+              variant: "destructive"
+            });
           }
         }
         
