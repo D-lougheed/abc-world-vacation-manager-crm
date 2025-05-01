@@ -89,14 +89,16 @@ const TripDetailPage = () => {
           const clientIds = clientRelations.map(relation => relation.client_id);
           const { data: clientsData, error: clientsError } = await supabase
             .from('clients')
-            .select('id, first_name, last_name, email')
+            .select('id, first_name, last_name')
             .in('id', clientIds);
           
           if (clientsError) throw clientsError;
+          
+          // Fixed: Remove email property as it doesn't exist in the clients table
           clients = clientsData?.map(client => ({
             id: client.id,
             name: `${client.first_name} ${client.last_name}`,
-            email: client.email || ""
+            email: "" // Set email to empty string since it doesn't exist in the table
           })) || [];
         }
         
