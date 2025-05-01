@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -852,7 +851,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       <FormMessage />
                     </FormItem>
                   )}
-                </FormField>
+                />
               </RoleBasedComponent>
               
               <FormField
