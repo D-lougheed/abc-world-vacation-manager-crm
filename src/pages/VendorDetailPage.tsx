@@ -16,6 +16,7 @@ import {
   CalendarCheck,
   Save,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +37,13 @@ import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface VendorFormData {
   name: string;
@@ -72,8 +80,10 @@ const VendorDetailPage = () => {
 
   // State for service types and tags
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
+  const [selectedServiceType, setSelectedServiceType] = useState<string>("");
   const [availableServiceTypes, setAvailableServiceTypes] = useState<Array<{id: string, name: string}>>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string>("");
   const [availableTags, setAvailableTags] = useState<Array<{id: string, name: string}>>([]);
   
   // State for bookings and documents
@@ -217,10 +227,22 @@ const VendorDetailPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: value
-    }));
+    
+    if (name === 'commissionRate') {
+      // Parse commission rate as a number
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) || value === '') {
+        setFormData(prevData => ({
+          ...prevData,
+          [name]: value === '' ? 0 : numValue
+        }));
+      }
+    } else {
+      setFormData(prevData => ({
+        ...prevData,
+        [name]: value
+      }));
+    }
   };
 
   const handlePriceRangeChange = (value: number[]) => {
@@ -230,11 +252,26 @@ const VendorDetailPage = () => {
     }));
   };
 
-  const handleCommissionRateChange = (value: number[]) => {
-    setFormData(prevData => ({
-      ...prevData,
-      commissionRate: value[0]
-    }));
+  const handleAddServiceType = () => {
+    if (selectedServiceType && !serviceTypes.includes(selectedServiceType)) {
+      setServiceTypes(prev => [...prev, selectedServiceType]);
+      setSelectedServiceType("");
+    }
+  };
+
+  const handleAddTag = () => {
+    if (selectedTag && !tags.includes(selectedTag)) {
+      setTags(prev => [...prev, selectedTag]);
+      setSelectedTag("");
+    }
+  };
+
+  const handleRemoveServiceType = (serviceType: string) => {
+    setServiceTypes(prev => prev.filter(st => st !== serviceType));
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setTags(prev => prev.filter(t => t !== tag));
   };
 
   const handleSaveVendor = async () => {
@@ -294,6 +331,76 @@ const VendorDetailPage = () => {
           title: "Vendor updated",
           description: "Vendor information has been successfully updated",
         });
+      }
+      
+      // Save service types for this vendor
+      if (serviceTypes.length > 0 && vendorId) {
+        // First, get the IDs of the service types by name
+        const { data: serviceTypeData, error: serviceTypeError } = await supabase
+          .from('service_types')
+          .select('id')
+          .in('name', serviceTypes);
+        
+        if (serviceTypeError) throw serviceTypeError;
+        
+        if (serviceTypeData && serviceTypeData.length > 0) {
+          // If updating an existing vendor, delete existing relationships
+          if (!isNewVendor) {
+            const { error: deleteError } = await supabase
+              .from('vendor_service_types')
+              .delete()
+              .eq('vendor_id', vendorId);
+            
+            if (deleteError) throw deleteError;
+          }
+          
+          // Insert new service type relationships
+          const vendorServiceTypes = serviceTypeData.map(st => ({
+            vendor_id: vendorId,
+            service_type_id: st.id
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('vendor_service_types')
+            .insert(vendorServiceTypes);
+          
+          if (insertError) throw insertError;
+        }
+      }
+      
+      // Save tags for this vendor
+      if (tags.length > 0 && vendorId) {
+        // First, get the IDs of the tags by name
+        const { data: tagData, error: tagError } = await supabase
+          .from('tags')
+          .select('id')
+          .in('name', tags);
+        
+        if (tagError) throw tagError;
+        
+        if (tagData && tagData.length > 0) {
+          // If updating an existing vendor, delete existing relationships
+          if (!isNewVendor) {
+            const { error: deleteError } = await supabase
+              .from('vendor_tags')
+              .delete()
+              .eq('vendor_id', vendorId);
+            
+            if (deleteError) throw deleteError;
+          }
+          
+          // Insert new tag relationships
+          const vendorTags = tagData.map(tag => ({
+            vendor_id: vendorId,
+            tag_id: tag.id
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('vendor_tags')
+            .insert(vendorTags);
+          
+          if (insertError) throw insertError;
+        }
       }
       
       // Navigate to the vendor detail page if created new
@@ -507,20 +614,109 @@ const VendorDetailPage = () => {
                 <Label htmlFor="commissionRate">Commission Rate (%)</Label>
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-primary" />
-                  <div className="w-full">
-                    <Slider
-                      defaultValue={[formData.commissionRate]}
-                      max={50}
-                      min={0}
-                      step={0.5}
-                      onValueChange={handleCommissionRateChange}
-                    />
-                  </div>
-                  <div className="w-16 text-right font-medium text-primary">
-                    {formData.commissionRate}%
-                  </div>
+                  <Input 
+                    id="commissionRate" 
+                    name="commissionRate" 
+                    value={formData.commissionRate}
+                    onChange={handleInputChange}
+                    placeholder="Enter commission rate percentage"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                  />
                 </div>
               </div>
+
+              {/* Service Types Selection */}
+              <div className="space-y-2">
+                <Label>Service Types</Label>
+                <div className="flex flex-wrap gap-2">
+                  {serviceTypes.map(type => (
+                    <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none flex items-center gap-1">
+                      {type}
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveServiceType(type)}
+                        className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Select
+                    value={selectedServiceType}
+                    onValueChange={setSelectedServiceType}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a service type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableServiceTypes.map(type => (
+                        <SelectItem key={type.id} value={type.name}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    type="button" 
+                    size="sm"
+                    onClick={handleAddServiceType}
+                    disabled={!selectedServiceType}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tags Selection */}
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map(tag => (
+                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {tag}
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-1 hover:bg-secondary/80 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Select
+                    value={selectedTag}
+                    onValueChange={setSelectedTag}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a tag" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTags.map(tag => (
+                        <SelectItem key={tag.id} value={tag.name}>
+                          {tag.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    type="button" 
+                    size="sm"
+                    onClick={handleAddTag}
+                    disabled={!selectedTag}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Notes</Label>
                 <Textarea 
@@ -626,12 +822,6 @@ const VendorDetailPage = () => {
                     ) : (
                       <p className="text-center py-8 text-muted-foreground">No service types assigned to this vendor.</p>
                     )}
-                    <RoleBasedComponent requiredRole={UserRole.Admin}>
-                      <Button variant="outline" size="sm">
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Service Types
-                      </Button>
-                    </RoleBasedComponent>
                   </div>
                 </TabsContent>
                 <TabsContent value="tags">
@@ -648,12 +838,6 @@ const VendorDetailPage = () => {
                     ) : (
                       <p className="text-center py-8 text-muted-foreground">No tags assigned to this vendor.</p>
                     )}
-                    <RoleBasedComponent requiredRole={UserRole.Admin}>
-                      <Button variant="outline" size="sm">
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Tags
-                      </Button>
-                    </RoleBasedComponent>
                   </div>
                 </TabsContent>
               </Tabs>
