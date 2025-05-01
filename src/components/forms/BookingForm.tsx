@@ -85,9 +85,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   // State for dropdown options
   const [clientOptions, setClientOptions] = useState<SelectOption[]>([]);
   const [vendorOptions, setVendorOptions] = useState<SelectOption[]>([]);
+  const [allServiceTypeOptions, setAllServiceTypeOptions] = useState<SelectOption[]>([]);
   const [serviceTypeOptions, setServiceTypeOptions] = useState<SelectOption[]>([]);
   const [tripOptions, setTripOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedVendorCommissionRate, setSelectedVendorCommissionRate] = useState<number | null>(null);
 
   // Default values for the form
   const defaultValues: Partial<BookingFormValues> = {
@@ -114,6 +116,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const watchCommissionRate = form.watch("commissionRate");
   const commissionAmount = (watchCost * watchCommissionRate) / 100;
   
+  // Watch the vendor selection to update service types and commission rate
+  const selectedVendor = form.watch("vendor");
+  
   // Fetch all necessary data from database
   useEffect(() => {
     const fetchOptions = async () => {
@@ -131,7 +136,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         // Fetch vendors
         const { data: vendors, error: vendorsError } = await supabase
           .from('vendors')
-          .select('id, name')
+          .select('id, name, commission_rate')
           .order('name');
           
         if (vendorsError) throw vendorsError;
@@ -163,12 +168,17 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           label: vendor.name
         })));
         
+        setAllServiceTypeOptions(serviceTypes.map(type => ({
+          value: type.id,
+          label: type.name
+        })));
+        
+        // Store all service types initially
         setServiceTypeOptions(serviceTypes.map(type => ({
           value: type.id,
           label: type.name
         })));
         
-        // FIX: Use "no_trip" as the value instead of empty string
         setTripOptions([
           { value: "no_trip", label: "No Trip" },
           ...trips.map(trip => ({
@@ -230,7 +240,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             notes: booking.notes || "",
             bookingStatus: booking.booking_status,
             isCompleted: booking.is_completed,
-            tripId: booking.trip_id || undefined,
+            tripId: booking.trip_id || "no_trip",
           });
           
         } catch (error: any) {
@@ -248,6 +258,74 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     }
   }, [bookingId, form, toast]);
 
+  // Update service types and commission rate when vendor changes
+  useEffect(() => {
+    if (selectedVendor) {
+      const fetchVendorDetails = async () => {
+        try {
+          setLoading(true);
+          
+          // Fetch vendor's commission rate
+          const { data: vendor, error: vendorError } = await supabase
+            .from('vendors')
+            .select('commission_rate')
+            .eq('id', selectedVendor)
+            .single();
+            
+          if (vendorError) throw vendorError;
+          
+          // Set the commission rate from vendor
+          if (vendor) {
+            setSelectedVendorCommissionRate(vendor.commission_rate);
+            form.setValue('commissionRate', vendor.commission_rate);
+          }
+          
+          // Fetch vendor's service types
+          const { data: vendorServiceTypes, error: serviceTypesError } = await supabase
+            .from('vendor_service_types')
+            .select('service_type_id')
+            .eq('vendor_id', selectedVendor);
+            
+          if (serviceTypesError) throw serviceTypesError;
+          
+          if (vendorServiceTypes && vendorServiceTypes.length > 0) {
+            // Filter service types to only those offered by the vendor
+            const vendorServiceTypeIds = vendorServiceTypes.map(st => st.service_type_id);
+            const filteredServiceTypes = allServiceTypeOptions.filter(
+              option => vendorServiceTypeIds.includes(option.value)
+            );
+            
+            setServiceTypeOptions(filteredServiceTypes);
+            
+            // Clear the selected service type if it's not in the filtered list
+            const currentServiceType = form.getValues('serviceType');
+            if (currentServiceType && !vendorServiceTypeIds.includes(currentServiceType)) {
+              form.setValue('serviceType', '');
+            }
+          } else {
+            // If vendor has no specific service types, show all of them
+            setServiceTypeOptions(allServiceTypeOptions);
+          }
+          
+        } catch (error: any) {
+          toast({
+            title: "Error",
+            description: `Failed to load vendor details: ${error.message}`,
+            variant: "destructive"
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchVendorDetails();
+    } else {
+      // Reset to all service types when no vendor is selected
+      setServiceTypeOptions(allServiceTypeOptions);
+      setSelectedVendorCommissionRate(null);
+    }
+  }, [selectedVendor, allServiceTypeOptions, form, toast]);
+
   // Handle form submission
   const onSubmit = async (values: BookingFormValues) => {
     try {
@@ -263,10 +341,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         throw new Error("You must be logged in to create a booking.");
       }
       
-      // FIX: Handle the "no_trip" special value
+      // Handle the "no_trip" special value
       const tripId = values.tripId === "no_trip" ? null : values.tripId;
       
-      let bookingId = values.tripId;
+      let bookingId = bookingId;
       
       // Insert or update booking
       if (bookingId) {
@@ -285,7 +363,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             booking_status: values.bookingStatus,
             is_completed: values.isCompleted,
             notes: values.notes || null,
-            trip_id: tripId, // FIX: Use tripId variable
+            trip_id: tripId,
           })
           .eq('id', bookingId);
           
@@ -316,7 +394,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             is_completed: values.isCompleted,
             commission_status: CommissionStatus.Unreceived,
             notes: values.notes || null,
-            trip_id: tripId, // FIX: Use tripId variable
+            trip_id: tripId,
             agent_id: user.id,
           })
           .select('id')
@@ -419,7 +497,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                         <FormLabel>Vendor</FormLabel>
                         <Select 
                           disabled={loading} 
-                          onValueChange={field.onChange} 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Reset service type when vendor changes
+                            form.setValue('serviceType', '');
+                          }}
                           defaultValue={field.value}
                           value={field.value}
                         >
@@ -448,14 +530,14 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       <FormItem>
                         <FormLabel>Service Type</FormLabel>
                         <Select 
-                          disabled={loading} 
+                          disabled={loading || serviceTypeOptions.length === 0 || !selectedVendor}
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
                           value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select service type" />
+                              <SelectValue placeholder={selectedVendor ? "Select service type" : "Select a vendor first"} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -481,8 +563,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       <Select 
                         disabled={loading} 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value || "no_trip"} // FIX: Use "no_trip" as default
-                        value={field.value || "no_trip"}        // FIX: Use "no_trip" for empty value
+                        defaultValue={field.value || "no_trip"}
+                        value={field.value || "no_trip"}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -671,12 +753,16 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                         <Percent className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input 
                           type="number" 
-                          className="pl-9" 
-                          {...field}
+                          className="pl-9"
+                          disabled={true} // Disabled because it comes from the vendor
+                          value={field.value}
                           onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </div>
                     </FormControl>
+                    <FormDescription>
+                      Commission rate is automatically set based on the selected vendor
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
