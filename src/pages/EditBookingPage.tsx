@@ -33,16 +33,27 @@ const EditBookingPage = () => {
         
         if (error) throw error;
         
+        // Helper function to convert 24hr time to 12hr format
+        const convertTo12HourFormat = (time24: string | null): string => {
+          if (!time24) return "";
+          
+          const [hours, minutes] = time24.split(':').map(Number);
+          const period = hours >= 12 ? 'PM' : 'AM';
+          const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
+          
+          return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+        };
+        
         // Transform the data to match the form's expected format
         const formattedData = {
           ...data,
           clients: data.booking_clients.map((bc: any) => bc.client_id),
-          vendor: data.vendor_id, // Fix: Use vendor_id directly as a string, not the vendor object
+          vendor: data.vendor_id, // Use vendor_id directly as a string
           serviceType: data.service_type_id,
           startDate: new Date(data.start_date),
-          startTime: data.start_time || "",
+          startTime: data.start_time ? convertTo12HourFormat(data.start_time) : "",
           endDate: data.end_date ? new Date(data.end_date) : undefined,
-          endTime: data.end_time || "",
+          endTime: data.end_time ? convertTo12HourFormat(data.end_time) : "",
           commissionRate: data.commission_rate,
           bookingStatus: data.booking_status,
           commissionStatus: data.commission_status,

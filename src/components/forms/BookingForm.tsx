@@ -51,8 +51,9 @@ import { MultiSelect } from "./MultiSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 
-// Time validation regex - format HH:MM (24-hour)
-const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+// Time validation regex - format for 12-hour time with AM/PM
+// Matches patterns like "1:30 PM", "12:45 AM", "3:05 pm", etc.
+const timeRegex = /^(1[0-2]|0?[1-9]):([0-5][0-9])\s?(AM|PM|am|pm)$/;
 
 // Schema for form validation
 const bookingSchema = z.object({
@@ -62,13 +63,13 @@ const bookingSchema = z.object({
   startDate: z.date({ required_error: "Start date is required" }),
   startTime: z.string()
     .refine(val => val === "" || timeRegex.test(val), {
-      message: "Time must be in format HH:MM (24-hour)",
+      message: "Time must be in format HH:MM AM/PM (e.g. 2:30 PM)",
     })
     .optional(),
   endDate: z.date().optional(),
   endTime: z.string()
     .refine(val => val === "" || timeRegex.test(val), {
-      message: "Time must be in format HH:MM (24-hour)",
+      message: "Time must be in format HH:MM AM/PM (e.g. 2:30 PM)",
     })
     .optional(),
   location: z.string().min(1, { message: "Location is required" }),
@@ -111,6 +112,34 @@ const generateTimeOptions = () => {
     }
   }
   return options;
+};
+
+// Helper function to convert 12-hour format to 24-hour format for database storage
+const convertTo24HourFormat = (time12: string | null | undefined): string | null => {
+  if (!time12) return null;
+  
+  // Normalize the time format
+  const normalizedTime = time12.trim().toUpperCase();
+  
+  // Extract hours, minutes, and period (AM/PM)
+  const match = normalizedTime.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
+  if (!match) return null;
+  
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = match[3];
+  
+  // Convert hours based on period
+  if (period === 'PM' && hours < 12) {
+    hours += 12;
+  } else if (period === 'AM' && hours === 12) {
+    hours = 0;
+  }
+  
+  // Format hours and minutes properly
+  const formattedHours = hours.toString().padStart(2, '0');
+  
+  return `${formattedHours}:${minutes}`;
 };
 
 const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
@@ -378,6 +407,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       // Calculate commission amount based on cost and rate
       const commissionAmount = (values.cost * values.commissionRate) / 100;
       
+      // Convert times to 24-hour format for database storage
+      const start_time = convertTo24HourFormat(values.startTime);
+      const end_time = convertTo24HourFormat(values.endTime);
+      
       // Get current user (agent)
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -399,9 +432,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             vendor_id: values.vendor,
             service_type_id: values.serviceType,
             start_date: values.startDate.toISOString().split('T')[0],
-            start_time: values.startTime || null,
+            start_time: start_time,
             end_date: values.endDate ? values.endDate.toISOString().split('T')[0] : null,
-            end_time: values.endTime || null,
+            end_time: end_time,
             location: values.location,
             cost: values.cost,
             commission_rate: values.commissionRate,
@@ -432,9 +465,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             vendor_id: values.vendor,
             service_type_id: values.serviceType,
             start_date: values.startDate.toISOString().split('T')[0],
-            start_time: values.startTime || null,
+            start_time: start_time,
             end_date: values.endDate ? values.endDate.toISOString().split('T')[0] : null,
-            end_time: values.endTime || null,
+            end_time: end_time,
             location: values.location,
             cost: values.cost,
             commission_rate: values.commissionRate,
@@ -719,14 +752,14 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                             <div className="relative">
                               <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                               <Input 
-                                placeholder="HH:MM (e.g. 14:30)" 
+                                placeholder="HH:MM AM/PM (e.g. 2:30 PM)" 
                                 className="pl-9" 
                                 {...field}
                               />
                             </div>
                           </FormControl>
                           <FormDescription>
-                            Use 24-hour format (e.g., 14:30)
+                            Use 12-hour format with AM/PM (e.g., 2:30 PM)
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -788,7 +821,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                             <div className="relative">
                               <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                               <Input 
-                                placeholder="HH:MM (e.g. 16:30)" 
+                                placeholder="HH:MM AM/PM (e.g. 4:30 PM)" 
                                 className="pl-9" 
                                 disabled={!form.getValues("endDate")}
                                 {...field}
@@ -796,7 +829,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                             </div>
                           </FormControl>
                           <FormDescription>
-                            Use 24-hour format (e.g., 16:30)
+                            Use 12-hour format with AM/PM (e.g., 4:30 PM)
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
