@@ -168,8 +168,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           label: type.name
         })));
         
+        // FIX: Use "no_trip" as the value instead of empty string
         setTripOptions([
-          { value: "", label: "No Trip" },
+          { value: "no_trip", label: "No Trip" },
           ...trips.map(trip => ({
             value: trip.id,
             label: trip.name
@@ -262,6 +263,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         throw new Error("You must be logged in to create a booking.");
       }
       
+      // FIX: Handle the "no_trip" special value
+      const tripId = values.tripId === "no_trip" ? null : values.tripId;
+      
       let bookingId = values.tripId;
       
       // Insert or update booking
@@ -281,7 +285,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             booking_status: values.bookingStatus,
             is_completed: values.isCompleted,
             notes: values.notes || null,
-            trip_id: values.tripId || null,
+            trip_id: tripId, // FIX: Use tripId variable
           })
           .eq('id', bookingId);
           
@@ -312,7 +316,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             is_completed: values.isCompleted,
             commission_status: CommissionStatus.Unreceived,
             notes: values.notes || null,
-            trip_id: values.tripId || null,
+            trip_id: tripId, // FIX: Use tripId variable
             agent_id: user.id,
           })
           .select('id')
@@ -477,8 +481,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       <Select 
                         disabled={loading} 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        value={field.value || ""}
+                        defaultValue={field.value || "no_trip"} // FIX: Use "no_trip" as default
+                        value={field.value || "no_trip"}        // FIX: Use "no_trip" for empty value
                       >
                         <FormControl>
                           <SelectTrigger>
