@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -82,14 +81,12 @@ const TripDetailPage = () => {
     if (id === "new") {
       setIsNewTrip(true);
       setLoading(false);
-      const today = new Date();
-      const tomorrow = new Date();
-      tomorrow.setDate(today.getDate() + 1);
       
+      // Set empty form data for new trip (no prepopulated values)
       setFormData({
-        name: "New Trip",
-        startDate: today.toISOString().split('T')[0],
-        endDate: tomorrow.toISOString().split('T')[0],
+        name: "",
+        startDate: "",
+        endDate: "",
         status: "Planned",
         highPriority: false,
         description: "",
@@ -367,6 +364,7 @@ const TripDetailPage = () => {
                     className="w-full p-2 border rounded-md"
                     value={formData.name}
                     onChange={handleInputChange}
+                    placeholder="Enter trip name"
                     required
                   />
                 </div>
@@ -448,6 +446,7 @@ const TripDetailPage = () => {
                   className="w-full p-2 border rounded-md"
                   value={formData.description}
                   onChange={handleInputChange}
+                  placeholder="Enter trip description"
                 ></textarea>
               </div>
               
@@ -460,6 +459,7 @@ const TripDetailPage = () => {
                   className="w-full p-2 border rounded-md"
                   value={formData.notes}
                   onChange={handleInputChange}
+                  placeholder="Enter any additional notes"
                 ></textarea>
               </div>
               
