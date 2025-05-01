@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -12,6 +13,7 @@ import {
   Percent,
   Users,
   Clock,
+  Star
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,7 @@ import { Badge } from "@/components/ui/badge";
 import { MultiSelect } from "./MultiSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 // Time validation regex - format for 12-hour time with AM/PM
 // Matches patterns like "1:30 PM", "12:45 AM", "3:05 pm", etc.
@@ -80,6 +83,7 @@ const bookingSchema = z.object({
   commissionStatus: z.enum(["Unreceived", "Received", "Canceled", "Completed"]),
   isCompleted: z.boolean().default(false),
   tripId: z.string().optional(),
+  rating: z.number().min(0).max(5).optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -174,6 +178,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     commissionStatus: CommissionStatus.Unreceived,
     isCompleted: false,
     tripId: initialData?.tripId || undefined,
+    rating: 0,
   };
 
   // Initialize react-hook-form
@@ -188,6 +193,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   
   // Watch the vendor selection to update service types and commission rate
   const selectedVendor = form.watch("vendor");
+  const currentRating = form.watch("rating") || 0;
   
   // Fetch all necessary data from database
   useEffect(() => {
@@ -325,6 +331,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             commissionStatus: booking.commission_status,
             isCompleted: booking.is_completed,
             tripId: booking.trip_id || "no_trip",
+            rating: booking.rating || 0,
           });
           
         } catch (error: any) {
@@ -409,6 +416,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       setSelectedVendorCommissionRate(null);
     }
   }, [selectedVendor, allServiceTypeOptions, form, toast]);
+  
+  // Handle star rating click
+  const handleRatingClick = (rating: number) => {
+    form.setValue('rating', rating);
+  };
 
   // Handle form submission
   const onSubmit = async (values: BookingFormValues) => {
@@ -455,6 +467,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
+            rating: values.rating || null,
           })
           .eq('id', bookingId);
           
@@ -489,6 +502,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             notes: values.notes || null,
             trip_id: tripId,
             agent_id: user.id,
+            rating: values.rating || null,
           })
           .select('id')
           .single();
@@ -510,6 +524,24 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           .insert(clientRelations);
           
         if (clientsError) throw clientsError;
+      }
+      
+      // If the booking is completed and has a rating, update the vendor's rating
+      if (values.isCompleted && values.bookingStatus === 'Confirmed' && values.rating && values.rating > 0) {
+        try {
+          // Call the update-vendor-ratings edge function
+          const { data: ratingData, error: ratingError } = await supabase.functions.invoke('update-vendor-ratings', {
+            body: { vendor_id: values.vendor }
+          });
+          
+          if (ratingError) {
+            console.error("Failed to update vendor rating:", ratingError);
+          } else {
+            console.log("Vendor rating updated:", ratingData);
+          }
+        } catch (ratingUpdateError) {
+          console.error("Error calling rating update function:", ratingUpdateError);
+        }
       }
       
       toast({
@@ -927,6 +959,43 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                 <p className="text-sm font-medium text-muted-foreground mb-1">Commission Amount</p>
                 <p className="text-2xl font-bold">${commissionAmount.toFixed(2)}</p>
               </div>
+              
+              {/* Rating Field - Only shown for completed bookings */}
+              {form.watch("isCompleted") && form.watch("bookingStatus") === "Confirmed" && (
+                <FormField
+                  control={form.control}
+                  name="rating"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rating (1-5 stars)</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center space-x-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => handleRatingClick(star)}
+                              className="focus:outline-none"
+                            >
+                              <Star
+                                className={`h-6 w-6 ${
+                                  star <= currentRating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-gray-300"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Rate your experience with this vendor (1-5 stars)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <FormField
                 control={form.control}

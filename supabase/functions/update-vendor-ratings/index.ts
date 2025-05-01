@@ -2,7 +2,17 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  
   try {
     // Create a Supabase client with the Auth context of the function
     const supabaseClient = createClient(
@@ -17,7 +27,7 @@ serve(async (req) => {
     if (!vendor_id) {
       return new Response(
         JSON.stringify({ error: 'Vendor ID is required' }),
-        { headers: { 'Content-Type': 'application/json' }, status: 400 }
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders }, status: 400 }
       )
     }
 
@@ -58,12 +68,12 @@ serve(async (req) => {
         rating: averageRating, 
         bookings_count: bookings.length 
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     )
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { 'Content-Type': 'application/json' }, status: 500 }
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders }, status: 500 }
     )
   }
 })
