@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -716,7 +715,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No specific time</SelectItem>
+                              <SelectItem value="none">No specific time</SelectItem>
                               {timeOptions.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
@@ -791,7 +790,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No specific time</SelectItem>
+                              <SelectItem value="none">No specific time</SelectItem>
                               {timeOptions.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
