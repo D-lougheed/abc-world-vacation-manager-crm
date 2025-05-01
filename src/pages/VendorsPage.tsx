@@ -9,7 +9,8 @@ import {
   Star,
   DollarSign,
   Tag,
-  CreditCard
+  CreditCard,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,34 +31,18 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
-import { UserRole } from "@/types";
+import { UserRole, Vendor } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-interface ServiceType {
-  id: string;
-  name: string;
-}
-
-interface Tag {
-  id: string;
-  name: string;
-}
-
-interface Vendor {
-  id: string;
-  name: string;
-  contactPerson: string;
+interface VendorWithDetails extends Vendor {
   serviceTypes: string[];
   tags: string[];
-  priceRange: number;
-  commissionRate: number;
-  rating: number;
 }
 
 const VendorsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<VendorWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -77,25 +62,25 @@ const VendorsPage = () => {
         if (vendorsError) throw vendorsError;
         
         // For each vendor, fetch associated service types and tags
-        const vendorsWithDetails = await Promise.all(vendorsData.map(async (vendor) => {
+        const vendorsWithDetails = await Promise.all((vendorsData || []).map(async (vendor) => {
           // Fetch service types for this vendor
           const { data: vendorServiceTypes, error: vendorServiceTypesError } = await supabase
             .from('vendor_service_types')
             .select('service_type_id')
             .eq('vendor_id', vendor.id);
           
-          if (vendorServiceTypesError) throw vendorServiceTypesError;
+          if (vendorServiceTypesError) console.error('Error fetching vendor service types:', vendorServiceTypesError);
           
           let serviceTypes: string[] = [];
-          if (vendorServiceTypes.length > 0) {
+          if (vendorServiceTypes && vendorServiceTypes.length > 0) {
             const serviceTypeIds = vendorServiceTypes.map(relation => relation.service_type_id);
             const { data: serviceTypesData, error: serviceTypesError } = await supabase
               .from('service_types')
               .select('name')
               .in('id', serviceTypeIds);
             
-            if (serviceTypesError) throw serviceTypesError;
-            serviceTypes = serviceTypesData.map(st => st.name);
+            if (serviceTypesError) console.error('Error fetching service types:', serviceTypesError);
+            serviceTypes = serviceTypesData ? serviceTypesData.map(st => st.name) : [];
           }
           
           // Fetch tags for this vendor
@@ -104,29 +89,34 @@ const VendorsPage = () => {
             .select('tag_id')
             .eq('vendor_id', vendor.id);
           
-          if (vendorTagsError) throw vendorTagsError;
+          if (vendorTagsError) console.error('Error fetching vendor tags:', vendorTagsError);
           
           let tags: string[] = [];
-          if (vendorTags.length > 0) {
+          if (vendorTags && vendorTags.length > 0) {
             const tagIds = vendorTags.map(relation => relation.tag_id);
             const { data: tagsData, error: tagsError } = await supabase
               .from('tags')
               .select('name')
               .in('id', tagIds);
             
-            if (tagsError) throw tagsError;
-            tags = tagsData.map(tag => tag.name);
+            if (tagsError) console.error('Error fetching tags:', tagsError);
+            tags = tagsData ? tagsData.map(tag => tag.name) : [];
           }
           
           return {
             id: vendor.id,
             name: vendor.name,
             contactPerson: vendor.contact_person,
-            serviceTypes: serviceTypes,
-            tags: tags,
+            serviceTypes,
+            tags,
             priceRange: vendor.price_range,
             commissionRate: vendor.commission_rate,
-            rating: vendor.rating
+            rating: vendor.rating || 0,
+            email: vendor.email,
+            phone: vendor.phone,
+            address: vendor.address,
+            serviceArea: vendor.service_area,
+            notes: vendor.notes
           };
         }));
         
@@ -233,7 +223,10 @@ const VendorsPage = () => {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8">
-                      Loading vendors...
+                      <div className="flex justify-center items-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                        <span>Loading vendors...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredVendors.length > 0 ? (

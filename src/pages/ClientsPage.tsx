@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Plus, 
@@ -7,6 +7,7 @@ import {
   UserPlus,
   FilePlus2,
   Calendar,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,19 +26,76 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { Client } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ClientWithCounts extends Client {
+  tripsCount: number;
+  bookingsCount: number;
+}
 
 const ClientsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [clients, setClients] = useState<ClientWithCounts[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // Dummy data - in a real app, this would come from your database
-  const clients = [
-    { id: "1", firstName: "John", lastName: "Smith", dateCreated: "2023-01-15", lastUpdated: "2023-05-01", tripsCount: 3, bookingsCount: 5 },
-    { id: "2", firstName: "Sarah", lastName: "Johnson", dateCreated: "2023-02-10", lastUpdated: "2023-04-28", tripsCount: 1, bookingsCount: 2 },
-    { id: "3", firstName: "Michael", lastName: "Davis", dateCreated: "2023-03-05", lastUpdated: "2023-05-10", tripsCount: 2, bookingsCount: 4 },
-    { id: "4", firstName: "Emma", lastName: "Wilson", dateCreated: "2023-03-15", lastUpdated: "2023-04-15", tripsCount: 0, bookingsCount: 1 },
-    { id: "5", firstName: "Robert", lastName: "Thompson", dateCreated: "2023-04-02", lastUpdated: "2023-05-05", tripsCount: 1, bookingsCount: 3 },
-  ];
+  // Fetch clients from Supabase
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch clients
+        const { data: clientsData, error: clientsError } = await supabase
+          .from('clients')
+          .select('*')
+          .order('last_name');
+        
+        if (clientsError) throw clientsError;
+
+        // For each client, get trip count and booking count
+        const clientsWithCounts = await Promise.all((clientsData || []).map(async (client) => {
+          // Count trips for this client
+          const { count: tripsCount, error: tripsError } = await supabase
+            .from('trip_clients')
+            .select('trip_id', { count: 'exact', head: true })
+            .eq('client_id', client.id);
+          
+          if (tripsError) console.error('Error fetching trip count:', tripsError);
+          
+          // Count bookings for this client
+          const { count: bookingsCount, error: bookingsError } = await supabase
+            .from('booking_clients')
+            .select('booking_id', { count: 'exact', head: true })
+            .eq('client_id', client.id);
+          
+          if (bookingsError) console.error('Error fetching booking count:', bookingsError);
+          
+          return {
+            ...client,
+            tripsCount: tripsCount || 0,
+            bookingsCount: bookingsCount || 0
+          };
+        }));
+        
+        setClients(clientsWithCounts);
+      } catch (error: any) {
+        console.error('Error fetching clients:', error);
+        toast({
+          title: "Failed to load clients",
+          description: error.message || "There was an error loading client data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, [toast]);
 
   // Filter clients based on search term
   const filteredClients = clients.filter((client) => {
@@ -86,34 +144,44 @@ const ClientsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
-                  <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/clients/${client.id}`)}>
-                    <TableCell className="font-medium">
-                      {client.firstName} {client.lastName}
-                    </TableCell>
-                    <TableCell>{new Date(client.dateCreated).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(client.lastUpdated).toLocaleDateString()}</TableCell>
-                    <TableCell>{client.tripsCount}</TableCell>
-                    <TableCell>{client.bookingsCount}</TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button variant="ghost" size="icon" onClick={(e) => {
-                          e.stopPropagation();
-                          // Add logic to create a new trip for this client
-                        }}>
-                          <Calendar className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={(e) => {
-                          e.stopPropagation();
-                          // Add logic to create a new booking for this client
-                        }}>
-                          <FilePlus2 className="h-4 w-4" />
-                        </Button>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="flex justify-center items-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                        <span>Loading clients...</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-                {filteredClients.length === 0 && (
+                ) : filteredClients.length > 0 ? (
+                  filteredClients.map((client) => (
+                    <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/clients/${client.id}`)}>
+                      <TableCell className="font-medium">
+                        {client.firstName} {client.lastName}
+                      </TableCell>
+                      <TableCell>{new Date(client.dateCreated).toLocaleDateString()}</TableCell>
+                      <TableCell>{new Date(client.lastUpdated).toLocaleDateString()}</TableCell>
+                      <TableCell>{client.tripsCount}</TableCell>
+                      <TableCell>{client.bookingsCount}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button variant="ghost" size="icon" onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/trips/new?clientId=${client.id}`);
+                          }}>
+                            <Calendar className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/bookings/new?clientId=${client.id}`);
+                          }}>
+                            <FilePlus2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No clients found. Try a different search term or add a new client.

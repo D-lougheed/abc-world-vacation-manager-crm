@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, 
@@ -12,6 +12,7 @@ import {
   Check,
   X,
   Clock,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,99 +33,156 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookingStatus, CommissionStatus } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface BookingWithDetails {
+  id: string;
+  clients: string[];
+  vendor: string;
+  trip?: string;
+  serviceType: string;
+  startDate: string;
+  endDate: string | null;
+  location: string;
+  cost: number;
+  commissionRate: number;
+  commissionAmount: number;
+  bookingStatus: BookingStatus;
+  isCompleted: boolean;
+  commissionStatus: CommissionStatus;
+  agent: string;
+}
 
 const BookingsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // Dummy data
-  const bookings = [
-    { 
-      id: "1", 
-      clients: ["John Smith", "Jane Smith"], 
-      vendor: "Delta Airlines", 
-      trip: "European Adventure",
-      serviceType: "Flight", 
-      startDate: "2023-06-15", 
-      endDate: null, 
-      location: "New York to Paris", 
-      cost: 850, 
-      commissionRate: 8, 
-      commissionAmount: 68,
-      bookingStatus: BookingStatus.Confirmed,
-      isCompleted: false,
-      commissionStatus: CommissionStatus.Unreceived,
-      agent: "Michael Brown"
-    },
-    { 
-      id: "2", 
-      clients: ["John Smith", "Jane Smith"], 
-      vendor: "Hotel Splendid", 
-      trip: "European Adventure",
-      serviceType: "Accommodation", 
-      startDate: "2023-06-15", 
-      endDate: "2023-06-20", 
-      location: "Paris, France", 
-      cost: 1200, 
-      commissionRate: 10, 
-      commissionAmount: 120,
-      bookingStatus: BookingStatus.Confirmed,
-      isCompleted: false,
-      commissionStatus: CommissionStatus.Unreceived,
-      agent: "Michael Brown"
-    },
-    { 
-      id: "3", 
-      clients: ["Robert Wilson"], 
-      vendor: "Caribbean Cruises", 
-      trip: "Caribbean Getaway",
-      serviceType: "Cruise", 
-      startDate: "2023-07-10", 
-      endDate: "2023-07-17", 
-      location: "Miami to Bahamas", 
-      cost: 2800, 
-      commissionRate: 15, 
-      commissionAmount: 420,
-      bookingStatus: BookingStatus.Pending,
-      isCompleted: false,
-      commissionStatus: CommissionStatus.Unreceived,
-      agent: "Sarah Johnson"
-    },
-    { 
-      id: "4", 
-      clients: ["Taylor Family"], 
-      vendor: "Safari Adventures", 
-      trip: "African Safari",
-      serviceType: "Tour", 
-      startDate: "2023-04-05", 
-      endDate: "2023-04-15", 
-      location: "Kenya", 
-      cost: 5200, 
-      commissionRate: 18, 
-      commissionAmount: 936,
-      bookingStatus: BookingStatus.Confirmed,
-      isCompleted: true,
-      commissionStatus: CommissionStatus.Received,
-      agent: "Michael Brown"
-    },
-    { 
-      id: "5", 
-      clients: ["Brown Family"], 
-      vendor: "NYC Hotels", 
-      trip: "NYC Weekend",
-      serviceType: "Accommodation", 
-      startDate: "2023-05-25", 
-      endDate: "2023-05-28", 
-      location: "New York City", 
-      cost: 750, 
-      commissionRate: 10, 
-      commissionAmount: 75,
-      bookingStatus: BookingStatus.Canceled,
-      isCompleted: false,
-      commissionStatus: CommissionStatus.Canceled,
-      agent: "Sarah Johnson"
-    },
-  ];
+  // Fetch bookings from Supabase
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch bookings
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('*, service_type_id')
+          .order('start_date', { ascending: false });
+        
+        if (bookingsError) throw bookingsError;
+        
+        // For each booking, fetch associated clients, vendor, service type, trip, and agent
+        const bookingsWithDetails = await Promise.all((bookingsData || []).map(async (booking) => {
+          // Fetch clients for this booking
+          const { data: bookingClients, error: bookingClientsError } = await supabase
+            .from('booking_clients')
+            .select('client_id')
+            .eq('booking_id', booking.id);
+          
+          if (bookingClientsError) console.error('Error fetching booking clients:', bookingClientsError);
+          
+          let clientNames: string[] = [];
+          if (bookingClients && bookingClients.length > 0) {
+            const clientIds = bookingClients.map(relation => relation.client_id);
+            const { data: clientsData, error: clientsError } = await supabase
+              .from('clients')
+              .select('first_name, last_name')
+              .in('id', clientIds);
+            
+            if (clientsError) console.error('Error fetching clients:', clientsError);
+            clientNames = clientsData ? clientsData.map(client => `${client.first_name} ${client.last_name}`) : [];
+          }
+          
+          // Fetch vendor name
+          let vendorName = "Unknown Vendor";
+          if (booking.vendor_id) {
+            const { data: vendorData, error: vendorError } = await supabase
+              .from('vendors')
+              .select('name')
+              .eq('id', booking.vendor_id)
+              .single();
+            
+            if (vendorError) console.error('Error fetching vendor:', vendorError);
+            if (vendorData) vendorName = vendorData.name;
+          }
+          
+          // Fetch service type
+          let serviceTypeName = "Unknown Service";
+          if (booking.service_type_id) {
+            const { data: serviceTypeData, error: serviceTypeError } = await supabase
+              .from('service_types')
+              .select('name')
+              .eq('id', booking.service_type_id)
+              .single();
+            
+            if (serviceTypeError) console.error('Error fetching service type:', serviceTypeError);
+            if (serviceTypeData) serviceTypeName = serviceTypeData.name;
+          }
+          
+          // Fetch trip name if exists
+          let tripName: string | undefined;
+          if (booking.trip_id) {
+            const { data: tripData, error: tripError } = await supabase
+              .from('trips')
+              .select('name')
+              .eq('id', booking.trip_id)
+              .single();
+            
+            if (tripError) console.error('Error fetching trip:', tripError);
+            if (tripData) tripName = tripData.name;
+          }
+          
+          // Fetch agent name
+          let agentName = "Unknown Agent";
+          if (booking.agent_id) {
+            const { data: agentData, error: agentError } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', booking.agent_id)
+              .single();
+            
+            if (agentError) console.error('Error fetching agent:', agentError);
+            if (agentData) agentName = `${agentData.first_name} ${agentData.last_name}`;
+          }
+          
+          return {
+            id: booking.id,
+            clients: clientNames,
+            vendor: vendorName,
+            trip: tripName,
+            serviceType: serviceTypeName,
+            startDate: booking.start_date,
+            endDate: booking.end_date,
+            location: booking.location,
+            cost: booking.cost,
+            commissionRate: booking.commission_rate,
+            commissionAmount: booking.commission_amount,
+            bookingStatus: booking.booking_status as BookingStatus,
+            isCompleted: booking.is_completed,
+            commissionStatus: booking.commission_status as CommissionStatus,
+            agent: agentName
+          };
+        }));
+        
+        setBookings(bookingsWithDetails);
+      } catch (error: any) {
+        console.error('Error fetching bookings:', error);
+        toast({
+          title: "Failed to load bookings",
+          description: error.message || "There was an error loading booking data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookings();
+  }, [toast]);
 
   // Filter bookings based on search term
   const filteredBookings = bookings.filter((booking) => {
@@ -220,69 +278,79 @@ const BookingsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBookings.map((booking) => (
-                  <TableRow 
-                    key={booking.id} 
-                    className="cursor-pointer hover:bg-muted/50" 
-                    onClick={() => navigate(`/bookings/${booking.id}`)}
-                  >
-                    <TableCell>
-                      <div className="font-medium flex items-center gap-1">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span>{booking.clients.join(", ")}</span>
-                      </div>
-                      {booking.trip && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {booking.trip}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Briefcase className="h-4 w-4 text-muted-foreground" />
-                        <span>{booking.serviceType}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {booking.vendor}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{new Date(booking.startDate).toLocaleDateString()}</span>
-                      </div>
-                      {booking.endDate && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          to {new Date(booking.endDate).toLocaleDateString()}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      ${booking.cost.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <CreditCard className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {booking.commissionRate}% rate
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-2">
-                        <Badge className={getBookingStatusBadgeStyle(booking.bookingStatus)}>
-                          {booking.isCompleted ? <Check className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
-                          {booking.bookingStatus}
-                        </Badge>
-                        <Badge className={getCommissionStatusBadgeStyle(booking.commissionStatus)} variant="outline">
-                          {booking.commissionStatus}
-                        </Badge>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="flex justify-center items-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                        <span>Loading bookings...</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-                {filteredBookings.length === 0 && (
+                ) : filteredBookings.length > 0 ? (
+                  filteredBookings.map((booking) => (
+                    <TableRow 
+                      key={booking.id} 
+                      className="cursor-pointer hover:bg-muted/50" 
+                      onClick={() => navigate(`/bookings/${booking.id}`)}
+                    >
+                      <TableCell>
+                        <div className="font-medium flex items-center gap-1">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span>{booking.clients.join(", ") || "No clients"}</span>
+                        </div>
+                        {booking.trip && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {booking.trip}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Briefcase className="h-4 w-4 text-muted-foreground" />
+                          <span>{booking.serviceType}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {booking.vendor}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{new Date(booking.startDate).toLocaleDateString()}</span>
+                        </div>
+                        {booking.endDate && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            to {new Date(booking.endDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        ${booking.cost.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <CreditCard className="h-4 w-4 text-primary" />
+                          <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {booking.commissionRate}% rate
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-2">
+                          <Badge className={getBookingStatusBadgeStyle(booking.bookingStatus)}>
+                            {booking.isCompleted ? <Check className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
+                            {booking.bookingStatus}
+                          </Badge>
+                          <Badge className={getCommissionStatusBadgeStyle(booking.commissionStatus)} variant="outline">
+                            {booking.commissionStatus}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No bookings found. Try a different search term or create a new booking.
