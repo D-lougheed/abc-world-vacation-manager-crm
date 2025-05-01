@@ -82,12 +82,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        // Convert string role to UserRole enum
+        let roleValue: UserRole;
+        
+        switch (data.role) {
+          case 'SuperAdmin':
+            roleValue = UserRole.SuperAdmin;
+            break;
+          case 'Admin':
+            roleValue = UserRole.Admin;
+            break;
+          case 'Agent':
+          default:
+            roleValue = UserRole.Agent;
+            break;
+        }
+        
         setUser({
           id: data.id,
           email: data.email,
           firstName: data.first_name,
           lastName: data.last_name,
-          role: data.role as UserRole, // Fixed by explicitly casting to UserRole
+          role: roleValue,
           isActive: data.is_active
         });
       }
