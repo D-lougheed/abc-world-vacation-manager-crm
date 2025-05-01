@@ -380,7 +380,17 @@ const VendorDetailPage = () => {
       
       // Save service types for this vendor
       if (serviceTypes.length > 0 && vendorId) {
-        // First, get the IDs of the service types by name
+        // First delete existing relationships
+        if (!isNewVendor) {
+          const { error: deleteError } = await supabase
+            .from('vendor_service_types')
+            .delete()
+            .eq('vendor_id', vendorId);
+          
+          if (deleteError) throw deleteError;
+        }
+        
+        // Get the IDs of the service types by name
         const { data: serviceTypeData, error: serviceTypeError } = await supabase
           .from('service_types')
           .select('id')
@@ -389,33 +399,43 @@ const VendorDetailPage = () => {
         if (serviceTypeError) throw serviceTypeError;
         
         if (serviceTypeData && serviceTypeData.length > 0) {
-          // If updating an existing vendor, delete existing relationships
-          if (!isNewVendor) {
-            const { error: deleteError } = await supabase
-              .from('vendor_service_types')
-              .delete()
-              .eq('vendor_id', vendorId);
-            
-            if (deleteError) throw deleteError;
-          }
-          
           // Insert new service type relationships
           const vendorServiceTypes = serviceTypeData.map(st => ({
             vendor_id: vendorId,
             service_type_id: st.id
           }));
           
-          const { error: insertError } = await supabase
-            .from('vendor_service_types')
-            .insert(vendorServiceTypes);
-          
-          if (insertError) throw insertError;
+          // Insert relationships one by one to avoid RLS issues
+          for (const relation of vendorServiceTypes) {
+            const { error: insertError } = await supabase
+              .from('vendor_service_types')
+              .insert(relation);
+            
+            if (insertError) {
+              console.error('Error inserting vendor service type:', insertError);
+              toast({
+                title: "Warning",
+                description: `Some service types may not have been saved: ${insertError.message}`,
+                variant: "destructive"
+              });
+            }
+          }
         }
       }
       
       // Save tags for this vendor
       if (tags.length > 0 && vendorId) {
-        // First, get the IDs of the tags by name
+        // First delete existing relationships
+        if (!isNewVendor) {
+          const { error: deleteError } = await supabase
+            .from('vendor_tags')
+            .delete()
+            .eq('vendor_id', vendorId);
+          
+          if (deleteError) throw deleteError;
+        }
+        
+        // Get the IDs of the tags by name
         const { data: tagData, error: tagError } = await supabase
           .from('tags')
           .select('id')
@@ -424,27 +444,24 @@ const VendorDetailPage = () => {
         if (tagError) throw tagError;
         
         if (tagData && tagData.length > 0) {
-          // If updating an existing vendor, delete existing relationships
-          if (!isNewVendor) {
-            const { error: deleteError } = await supabase
+          // Insert new tag relationships one by one to avoid RLS issues
+          for (const tag of tagData) {
+            const { error: insertError } = await supabase
               .from('vendor_tags')
-              .delete()
-              .eq('vendor_id', vendorId);
+              .insert({
+                vendor_id: vendorId,
+                tag_id: tag.id
+              });
             
-            if (deleteError) throw deleteError;
+            if (insertError) {
+              console.error('Error inserting vendor tag:', insertError);
+              toast({
+                title: "Warning",
+                description: `Some tags may not have been saved: ${insertError.message}`,
+                variant: "destructive"
+              });
+            }
           }
-          
-          // Insert new tag relationships
-          const vendorTags = tagData.map(tag => ({
-            vendor_id: vendorId,
-            tag_id: tag.id
-          }));
-          
-          const { error: insertError } = await supabase
-            .from('vendor_tags')
-            .insert(vendorTags);
-          
-          if (insertError) throw insertError;
         }
       }
       
@@ -905,108 +922,77 @@ const VendorDetailPage = () => {
           </CardFooter>
         </Card>
         
-        {/* Right column: Vendor details */}
+        {/* Right column: Split into two cards - Bookings and Documents */}
         {!isNewVendor && (
-          <Card className="col-span-3 md:col-span-2">
-            <CardHeader>
-              <CardTitle>Vendor Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="bookings">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="bookings">Booking History</TabsTrigger>
-                  <TabsTrigger value="documents">Documents</TabsTrigger>
-                  <TabsTrigger value="serviceTypes">Service Types</TabsTrigger>
-                  <TabsTrigger value="tags">Tags</TabsTrigger>
-                </TabsList>
-                <TabsContent value="bookings">
-                  <div className="space-y-3">
-                    {bookings.length > 0 ? (
-                      bookings.map((booking) => (
-                        <div key={booking.id} className="flex items-center justify-between rounded-md border p-3 cursor-pointer hover:bg-muted/50">
-                          <div>
-                            <p className="font-medium">{booking.service_types?.name || "Service"}</p>
-                            <div className="text-sm text-muted-foreground">
-                              {booking.location} • {new Date(booking.start_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="font-medium">${booking.cost}</p>
-                              <p className="text-xs text-primary">${booking.commission_amount} commission</p>
-                            </div>
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              booking.booking_status === "Confirmed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                            }`}>
-                              {booking.booking_status}
-                            </span>
+          <>
+            {/* Bookings Card */}
+            <Card className="col-span-3 md:col-span-2 lg:col-span-1">
+              <CardHeader>
+                <CardTitle>Booking History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {bookings.length > 0 ? (
+                    bookings.map((booking) => (
+                      <div key={booking.id} className="flex items-center justify-between rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                        <div>
+                          <p className="font-medium">{booking.service_types?.name || "Service"}</p>
+                          <div className="text-sm text-muted-foreground">
+                            {booking.location} • {new Date(booking.start_date).toLocaleDateString()}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-center py-8 text-muted-foreground">No bookings found for this vendor.</p>
-                    )}
-                  </div>
-                </TabsContent>
-                <TabsContent value="documents">
-                  <div className="space-y-3">
-                    {documents.length > 0 ? (
-                      documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span>{doc.file_name}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-medium">${booking.cost}</p>
+                            <p className="text-xs text-primary">${booking.commission_amount} commission</p>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(doc.uploaded_at).toLocaleDateString()}
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            booking.booking_status === "Confirmed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                          }`}>
+                            {booking.booking_status}
                           </span>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">No documents uploaded for this vendor.</p>
-                        <Button variant="outline" className="mt-4">
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Document
-                        </Button>
                       </div>
-                    )}
-                  </div>
-                </TabsContent>
-                <TabsContent value="serviceTypes">
-                  <div>
-                    {serviceTypes.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {serviceTypes.map((type) => (
-                          <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none">
-                            {type}
-                          </Badge>
-                        ))}
+                    ))
+                  ) : (
+                    <p className="text-center py-8 text-muted-foreground">No bookings found for this vendor.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Documents Card */}
+            <Card className="col-span-3 md:col-span-2 lg:col-span-1">
+              <CardHeader>
+                <CardTitle>Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {documents.length > 0 ? (
+                    documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span>{doc.file_name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(doc.uploaded_at).toLocaleDateString()}
+                        </span>
                       </div>
-                    ) : (
-                      <p className="text-center py-8 text-muted-foreground">No service types assigned to this vendor.</p>
-                    )}
-                  </div>
-                </TabsContent>
-                <TabsContent value="tags">
-                  <div>
-                    {tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center py-8 text-muted-foreground">No tags assigned to this vendor.</p>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No documents uploaded for this vendor.</p>
+                      <Button variant="outline" className="mt-4">
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Document
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </div>
