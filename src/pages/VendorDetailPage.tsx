@@ -17,6 +17,7 @@ import {
   Save,
   Trash2,
   X,
+  DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface VendorFormData {
   name: string;
@@ -64,6 +74,8 @@ const VendorDetailPage = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(isNewVendor);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // State for vendor form
   const [formData, setFormData] = useState<VendorFormData>({
@@ -274,6 +286,39 @@ const VendorDetailPage = () => {
     setTags(prev => prev.filter(t => t !== tag));
   };
 
+  const handleDeleteVendor = async () => {
+    try {
+      setSaving(true);
+      
+      // First delete vendor relationships
+      await supabase.from('vendor_service_types').delete().eq('vendor_id', id);
+      await supabase.from('vendor_tags').delete().eq('vendor_id', id);
+      await supabase.from('vendor_files').delete().eq('vendor_id', id);
+      
+      // Then delete the vendor
+      const { error } = await supabase.from('vendors').delete().eq('id', id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Vendor deleted",
+        description: "The vendor has been successfully removed"
+      });
+      
+      navigate('/vendors');
+    } catch (error: any) {
+      console.error('Error deleting vendor:', error);
+      toast({
+        title: "Failed to delete vendor",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   const handleSaveVendor = async () => {
     try {
       setSaving(true);
@@ -406,6 +451,9 @@ const VendorDetailPage = () => {
       // Navigate to the vendor detail page if created new
       if (isNewVendor && vendorId) {
         navigate(`/vendors/${vendorId}`);
+      } else {
+        // Exit edit mode after saving
+        setIsEditMode(false);
       }
     } catch (error: any) {
       console.error('Error saving vendor:', error);
@@ -475,30 +523,30 @@ const VendorDetailPage = () => {
         </div>
         
         <div className="flex gap-2">
-          <Button onClick={handleSaveVendor} disabled={saving}>
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                {isNewVendor ? "Create Vendor" : "Save Changes"}
-              </>
-            )}
-          </Button>
-          
-          {!isNewVendor && (
+          {isEditMode ? (
+            <Button onClick={handleSaveVendor} disabled={saving}>
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isNewVendor ? "Create Vendor" : "Save Changes"}
+                </>
+              )}
+            </Button>
+          ) : (
             <RoleBasedComponent requiredRole={UserRole.Admin}>
-              <Button variant="outline" onClick={() => navigate(`/vendors/${id}/edit`)}>
+              <Button onClick={() => setIsEditMode(true)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Vendor
               </Button>
             </RoleBasedComponent>
           )}
           
-          {!isNewVendor && (
+          {!isNewVendor && !isEditMode && (
             <Button variant="outline">
               <CalendarCheck className="mr-2 h-4 w-4" />
               Create Booking
@@ -508,244 +556,360 @@ const VendorDetailPage = () => {
       </div>
       
       <div className="grid grid-cols-3 gap-6">
+        {/* Left column: Vendor information */}
         <Card className="col-span-3 md:col-span-1">
           <CardHeader>
-            <CardTitle>{isNewVendor ? "Vendor Information" : "Edit Vendor Information"}</CardTitle>
+            <CardTitle>{isEditMode ? (isNewVendor ? "Vendor Information" : "Edit Vendor Information") : "Vendor Details"}</CardTitle>
             {isNewVendor && <CardDescription>Add details about this vendor</CardDescription>}
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Vendor Name*</Label>
-                <Input 
-                  id="name" 
-                  name="name" 
-                  value={formData.name} 
-                  onChange={handleInputChange} 
-                  placeholder="Enter vendor company name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contactPerson">Contact Person*</Label>
-                <Input 
-                  id="contactPerson" 
-                  name="contactPerson" 
-                  value={formData.contactPerson} 
-                  onChange={handleInputChange}
-                  placeholder="Primary contact name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email*</Label>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    name="email" 
-                    type="email"
-                    value={formData.email} 
-                    onChange={handleInputChange}
-                    placeholder="contact@vendor.com"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone*</Label>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="phone" 
-                    name="phone" 
-                    value={formData.phone} 
-                    onChange={handleInputChange}
-                    placeholder="+1 (555) 123-4567"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-2" />
-                  <Input 
-                    id="address" 
-                    name="address" 
-                    value={formData.address} 
-                    onChange={handleInputChange}
-                    placeholder="123 Business Ave, City, State"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="serviceArea">Service Area</Label>
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="serviceArea" 
-                    name="serviceArea" 
-                    value={formData.serviceArea} 
-                    onChange={handleInputChange}
-                    placeholder="Local, Regional, National, or Global"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Price Range</Label>
-                <div className="space-y-2">
-                  <div className="pt-4">
-                    <Slider
-                      defaultValue={[formData.priceRange]}
-                      max={5}
-                      min={1}
-                      step={1}
-                      onValueChange={handlePriceRangeChange}
+              {isEditMode ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Vendor Name*</Label>
+                    <Input 
+                      id="name" 
+                      name="name" 
+                      value={formData.name} 
+                      onChange={handleInputChange} 
+                      placeholder="Enter vendor company name"
+                      required
                     />
                   </div>
-                  <div className="flex justify-between">
-                    <div className="text-lg">{renderPriceRange(formData.priceRange)}</div>
-                    <p className="text-sm text-muted-foreground">{formData.priceRange} / 5</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactPerson">Contact Person*</Label>
+                    <Input 
+                      id="contactPerson" 
+                      name="contactPerson" 
+                      value={formData.contactPerson} 
+                      onChange={handleInputChange}
+                      placeholder="Primary contact name"
+                      required
+                    />
                   </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="commissionRate">Commission Rate (%)</Label>
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-primary" />
-                  <Input 
-                    id="commissionRate" 
-                    name="commissionRate" 
-                    value={formData.commissionRate}
-                    onChange={handleInputChange}
-                    placeholder="Enter commission rate percentage"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email*</Label>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="email" 
+                        name="email" 
+                        type="email"
+                        value={formData.email} 
+                        onChange={handleInputChange}
+                        placeholder="contact@vendor.com"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone*</Label>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="phone" 
+                        name="phone" 
+                        value={formData.phone} 
+                        onChange={handleInputChange}
+                        placeholder="+1 (555) 123-4567"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-2" />
+                      <Input 
+                        id="address" 
+                        name="address" 
+                        value={formData.address} 
+                        onChange={handleInputChange}
+                        placeholder="123 Business Ave, City, State"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="serviceArea">Service Area</Label>
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="serviceArea" 
+                        name="serviceArea" 
+                        value={formData.serviceArea} 
+                        onChange={handleInputChange}
+                        placeholder="Local, Regional, National, or Global"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Price Range</Label>
+                    <div className="space-y-2">
+                      <div className="pt-4">
+                        <Slider
+                          defaultValue={[formData.priceRange]}
+                          max={5}
+                          min={1}
+                          step={1}
+                          onValueChange={handlePriceRangeChange}
+                        />
+                      </div>
+                      <div className="flex justify-between">
+                        <div className="text-lg">{renderPriceRange(formData.priceRange)}</div>
+                        <p className="text-sm text-muted-foreground">{formData.priceRange} / 5</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionRate">Commission Rate (%)</Label>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-primary" />
+                      <Input 
+                        id="commissionRate" 
+                        name="commissionRate" 
+                        value={formData.commissionRate}
+                        onChange={handleInputChange}
+                        placeholder="Enter commission rate percentage"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                      />
+                    </div>
+                  </div>
 
-              {/* Service Types Selection */}
-              <div className="space-y-2">
-                <Label>Service Types</Label>
-                <div className="flex flex-wrap gap-2">
-                  {serviceTypes.map(type => (
-                    <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none flex items-center gap-1">
-                      {type}
-                      <button 
-                        type="button"
-                        onClick={() => handleRemoveServiceType(type)}
-                        className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Select
-                    value={selectedServiceType}
-                    onValueChange={setSelectedServiceType}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a service type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableServiceTypes.map(type => (
-                        <SelectItem key={type.id} value={type.name}>
-                          {type.name}
-                        </SelectItem>
+                  {/* Service Types Selection */}
+                  <div className="space-y-2">
+                    <Label>Service Types</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {serviceTypes.map(type => (
+                        <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none flex items-center gap-1">
+                          {type}
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveServiceType(type)}
+                            className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    type="button" 
-                    size="sm"
-                    onClick={handleAddServiceType}
-                    disabled={!selectedServiceType}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-
-              {/* Tags Selection */}
-              <div className="space-y-2">
-                <Label>Tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {tag}
-                      <button 
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="ml-1 hover:bg-secondary/80 rounded-full p-0.5"
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Select
+                        value={selectedServiceType}
+                        onValueChange={setSelectedServiceType}
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Select
-                    value={selectedTag}
-                    onValueChange={setSelectedTag}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a tag" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTags.map(tag => (
-                        <SelectItem key={tag.id} value={tag.name}>
-                          {tag.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    type="button" 
-                    size="sm"
-                    onClick={handleAddTag}
-                    disabled={!selectedTag}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a service type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableServiceTypes.map(type => (
+                            <SelectItem key={type.id} value={type.name}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        type="button" 
+                        size="sm"
+                        onClick={handleAddServiceType}
+                        disabled={!selectedServiceType}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea 
-                  id="notes" 
-                  name="notes" 
-                  value={formData.notes || ''} 
-                  onChange={handleInputChange}
-                  placeholder="Add any additional information about this vendor"
-                  className="min-h-[100px]"
-                />
-              </div>
+                  {/* Tags Selection */}
+                  <div className="space-y-2">
+                    <Label>Tags</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map(tag => (
+                        <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {tag}
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="ml-1 hover:bg-secondary/80 rounded-full p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Select
+                        value={selectedTag}
+                        onValueChange={setSelectedTag}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a tag" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableTags.map(tag => (
+                            <SelectItem key={tag.id} value={tag.name}>
+                              {tag.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        type="button" 
+                        size="sm"
+                        onClick={handleAddTag}
+                        disabled={!selectedTag}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea 
+                      id="notes" 
+                      name="notes" 
+                      value={formData.notes || ''} 
+                      onChange={handleInputChange}
+                      placeholder="Add any additional information about this vendor"
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                </>
+              ) : (
+                // View mode
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-medium text-sm text-muted-foreground">Contact Person</h3>
+                      <p className="font-medium">{formData.contactPerson}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-sm text-muted-foreground">Price Range</h3>
+                      <p>{renderPriceRange(formData.priceRange)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <p>{formData.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <p>{formData.phone}</p>
+                    </div>
+                    <div className="flex items-start gap-2 mb-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <p>{formData.address || "No address provided"}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      <p>{formData.serviceArea}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-primary" />
+                      <p className="font-medium">{formData.commissionRate}% Commission Rate</p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-2">Service Types</h3>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {serviceTypes.length > 0 ? (
+                        serviceTypes.map(type => (
+                          <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none">
+                            {type}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No service types assigned</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-2">Tags</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.length > 0 ? (
+                        tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {tag}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No tags assigned</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {formData.notes && (
+                    <div className="pt-2 border-t">
+                      <h3 className="font-medium text-sm text-muted-foreground mb-2">Notes</h3>
+                      <p className="text-sm">{formData.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="justify-between">
-            {isNewVendor ? (
-              <p className="text-sm text-muted-foreground">* Required fields</p>
+            {isEditMode ? (
+              isNewVendor ? (
+                <p className="text-sm text-muted-foreground">* Required fields</p>
+              ) : (
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Vendor
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Delete Vendor</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete this vendor? This action cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                      <Button 
+                        variant="destructive" 
+                        onClick={handleDeleteVendor}
+                        disabled={saving}
+                      >
+                        {saving ? "Deleting..." : "Delete Vendor"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )
             ) : (
-              <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Vendor
-              </Button>
+              <RoleBasedComponent requiredRole={UserRole.Admin}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditMode(true)}
+                  className="w-full"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Vendor Details
+                </Button>
+              </RoleBasedComponent>
             )}
           </CardFooter>
         </Card>
         
+        {/* Right column: Vendor details */}
         {!isNewVendor && (
           <Card className="col-span-3 md:col-span-2">
             <CardHeader>
-              <CardTitle>Vendor Details</CardTitle>
+              <CardTitle>Vendor Activity</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="bookings">
