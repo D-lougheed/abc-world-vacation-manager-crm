@@ -96,7 +96,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
 
   // Default values for the form
   const defaultValues: Partial<BookingFormValues> = {
-    clients: [],
+    clients: initialData?.clients || [],
     vendor: "",
     serviceType: "",
     startDate: new Date(),
@@ -107,7 +107,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     bookingStatus: BookingStatus.Pending,
     commissionStatus: CommissionStatus.Unreceived,
     isCompleted: false,
-    tripId: undefined,
+    tripId: initialData?.tripId || undefined,
   };
 
   // Initialize react-hook-form
