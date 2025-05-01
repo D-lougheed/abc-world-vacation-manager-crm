@@ -30,6 +30,20 @@ import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
+// Define interfaces for our data structures
+interface VendorType {
+  id?: string;
+  name: string;
+  commissionRate: number;
+  serviceTypes: any[];
+}
+
+interface AgentType {
+  id?: string;
+  name: string;
+  email: string;
+}
+
 const BookingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [notes, setNotes] = useState("");
@@ -98,7 +112,7 @@ const BookingDetailPage = () => {
         }
         
         // Fetch vendor data
-        let vendor = { name: "Unknown Vendor", commissionRate: 0, serviceTypes: [] };
+        let vendor: VendorType = { name: "Unknown Vendor", commissionRate: 0, serviceTypes: [] };
         if (bookingData.vendor_id) {
           const { data: vendorData, error: vendorError } = await supabase
             .from('vendors')
@@ -151,7 +165,7 @@ const BookingDetailPage = () => {
         }
         
         // Fetch agent data
-        let agent = { name: "Unknown Agent", email: "" };
+        let agent: AgentType = { name: "Unknown Agent", email: "" };
         if (bookingData.agent_id) {
           const { data: agentData, error: agentError } = await supabase
             .from('profiles')
