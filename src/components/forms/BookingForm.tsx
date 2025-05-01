@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -344,7 +343,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       // Handle the "no_trip" special value
       const tripId = values.tripId === "no_trip" ? null : values.tripId;
       
-      let bookingId = bookingId;
+      let newBookingId = bookingId;
       
       // Insert or update booking
       if (bookingId) {
@@ -402,12 +401,12 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           
         if (insertError) throw insertError;
         
-        bookingId = newBooking.id;
+        newBookingId = newBooking.id;
       }
       
       // Insert client relations
       const clientRelations = values.clients.map(clientId => ({
-        booking_id: bookingId,
+        booking_id: newBookingId,
         client_id: clientId
       }));
       
@@ -422,7 +421,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         description: `Booking successfully ${bookingId ? 'updated' : 'created'}.`,
       });
       
-      navigate(`/bookings/${bookingId}`);
+      navigate(`/bookings/${newBookingId}`);
       
     } catch (error: any) {
       toast({
