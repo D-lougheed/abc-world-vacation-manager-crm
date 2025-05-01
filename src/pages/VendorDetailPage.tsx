@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -382,43 +381,70 @@ const VendorDetailPage = () => {
       if (serviceTypes.length > 0 && vendorId) {
         // First delete existing relationships
         if (!isNewVendor) {
-          const { error: deleteError } = await supabase
-            .from('vendor_service_types')
-            .delete()
-            .eq('vendor_id', vendorId);
-          
-          if (deleteError) throw deleteError;
+          try {
+            const { error: deleteError } = await supabase
+              .from('vendor_service_types')
+              .delete()
+              .eq('vendor_id', vendorId);
+            
+            if (deleteError) {
+              console.error('Error deleting vendor service types:', deleteError);
+              toast({
+                title: "Warning",
+                description: `Error removing existing service types: ${deleteError.message}`,
+                variant: "destructive"
+              });
+            }
+          } catch (error) {
+            console.error('Exception deleting vendor service types:', error);
+          }
         }
         
         // Get the IDs of the service types by name
         const { data: serviceTypeData, error: serviceTypeError } = await supabase
           .from('service_types')
-          .select('id')
+          .select('id, name')
           .in('name', serviceTypes);
         
-        if (serviceTypeError) throw serviceTypeError;
-        
-        if (serviceTypeData && serviceTypeData.length > 0) {
-          // Insert new service type relationships
-          const vendorServiceTypes = serviceTypeData.map(st => ({
-            vendor_id: vendorId,
-            service_type_id: st.id
-          }));
+        if (serviceTypeError) {
+          console.error('Error fetching service types:', serviceTypeError);
+          toast({
+            title: "Warning",
+            description: `Could not retrieve service type IDs: ${serviceTypeError.message}`,
+            variant: "destructive"
+          });
+        } else if (serviceTypeData && serviceTypeData.length > 0) {
+          // Insert new service type relationships one by one
+          let successCount = 0;
+          let failCount = 0;
           
-          // Insert relationships one by one to avoid RLS issues
-          for (const relation of vendorServiceTypes) {
-            const { error: insertError } = await supabase
-              .from('vendor_service_types')
-              .insert(relation);
-            
-            if (insertError) {
-              console.error('Error inserting vendor service type:', insertError);
-              toast({
-                title: "Warning",
-                description: `Some service types may not have been saved: ${insertError.message}`,
-                variant: "destructive"
-              });
+          for (const st of serviceTypeData) {
+            try {
+              const { error: insertError } = await supabase
+                .from('vendor_service_types')
+                .insert({
+                  vendor_id: vendorId,
+                  service_type_id: st.id
+                });
+              
+              if (insertError) {
+                console.error(`Error adding service type ${st.name}:`, insertError);
+                failCount++;
+              } else {
+                successCount++;
+              }
+            } catch (error) {
+              console.error(`Exception adding service type ${st.name}:`, error);
+              failCount++;
             }
+          }
+          
+          if (failCount > 0) {
+            toast({
+              title: "Warning",
+              description: `Added ${successCount} service types, but ${failCount} failed due to permissions.`,
+              variant: "destructive"
+            });
           }
         }
       }
@@ -427,40 +453,70 @@ const VendorDetailPage = () => {
       if (tags.length > 0 && vendorId) {
         // First delete existing relationships
         if (!isNewVendor) {
-          const { error: deleteError } = await supabase
-            .from('vendor_tags')
-            .delete()
-            .eq('vendor_id', vendorId);
-          
-          if (deleteError) throw deleteError;
+          try {
+            const { error: deleteError } = await supabase
+              .from('vendor_tags')
+              .delete()
+              .eq('vendor_id', vendorId);
+            
+            if (deleteError) {
+              console.error('Error deleting vendor tags:', deleteError);
+              toast({
+                title: "Warning",
+                description: `Error removing existing tags: ${deleteError.message}`,
+                variant: "destructive"
+              });
+            }
+          } catch (error) {
+            console.error('Exception deleting vendor tags:', error);
+          }
         }
         
         // Get the IDs of the tags by name
         const { data: tagData, error: tagError } = await supabase
           .from('tags')
-          .select('id')
+          .select('id, name')
           .in('name', tags);
         
-        if (tagError) throw tagError;
-        
-        if (tagData && tagData.length > 0) {
-          // Insert new tag relationships one by one to avoid RLS issues
+        if (tagError) {
+          console.error('Error fetching tags:', tagError);
+          toast({
+            title: "Warning",
+            description: `Could not retrieve tag IDs: ${tagError.message}`,
+            variant: "destructive"
+          });
+        } else if (tagData && tagData.length > 0) {
+          // Insert new tag relationships one by one
+          let successCount = 0;
+          let failCount = 0;
+          
           for (const tag of tagData) {
-            const { error: insertError } = await supabase
-              .from('vendor_tags')
-              .insert({
-                vendor_id: vendorId,
-                tag_id: tag.id
-              });
-            
-            if (insertError) {
-              console.error('Error inserting vendor tag:', insertError);
-              toast({
-                title: "Warning",
-                description: `Some tags may not have been saved: ${insertError.message}`,
-                variant: "destructive"
-              });
+            try {
+              const { error: insertError } = await supabase
+                .from('vendor_tags')
+                .insert({
+                  vendor_id: vendorId,
+                  tag_id: tag.id
+                });
+              
+              if (insertError) {
+                console.error(`Error adding tag ${tag.name}:`, insertError);
+                failCount++;
+              } else {
+                successCount++;
+              }
+            } catch (error) {
+              console.error(`Exception adding tag ${tag.name}:`, error);
+              failCount++;
             }
+          }
+          
+          if (failCount > 0) {
+            toast({
+              title: "Warning",
+              description: `Added ${successCount} tags, but ${failCount} failed due to permissions.`,
+              variant: "destructive"
+            });
           }
         }
       }
