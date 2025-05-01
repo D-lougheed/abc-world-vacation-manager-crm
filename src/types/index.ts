@@ -1,8 +1,8 @@
 
 export enum UserRole {
-  SuperAdmin = 1,
-  Admin = 2,
-  Agent = 3
+  SuperAdmin = "SuperAdmin",
+  Admin = "Admin",
+  Agent = "Agent"
 }
 
 export interface User {
@@ -58,7 +58,7 @@ export interface Trip {
   endDate: string;
   isHighPriority: boolean;
   description?: string;
-  clients: Client[];
+  clients: Client[] | string[];
   notes?: string;
   bookings?: Booking[];
 }
@@ -78,8 +78,8 @@ export enum CommissionStatus {
 
 export interface Booking {
   id: string;
-  clients: Client[];
-  vendor: Vendor;
+  clients: Client[] | string[];
+  vendor: Vendor | string;
   trip?: Trip;
   serviceType: ServiceType;
   startDate: string;
@@ -91,7 +91,7 @@ export interface Booking {
   bookingStatus: BookingStatus;
   isCompleted: boolean;
   commissionStatus: CommissionStatus;
-  agent: User;
+  agent: User | string;
   notes?: string;
   files?: string[];
 }

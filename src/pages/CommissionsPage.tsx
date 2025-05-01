@@ -124,8 +124,8 @@ const CommissionsPage = () => {
             vendor: vendorData?.name || 'Unknown Vendor',
             agent: agentData ? `${agentData.first_name} ${agentData.last_name}` : 'Unknown Agent',
             date: booking.start_date,
-            bookingStatus: booking.booking_status,
-            commissionStatus: booking.commission_status,
+            bookingStatus: booking.booking_status as BookingStatus,
+            commissionStatus: booking.commission_status as CommissionStatus,
             cost: booking.cost,
             commissionRate: booking.commission_rate,
             commissionAmount: booking.commission_amount

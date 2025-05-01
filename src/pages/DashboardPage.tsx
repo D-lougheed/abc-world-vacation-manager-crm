@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarCheck, Users, Plane, CreditCard, CalendarClock } from "lucide-react";
@@ -455,7 +454,7 @@ const DashboardPage = () => {
                     <div className="flex items-center gap-2">
                       <p className="text-xs">{new Date(trip.startDate).toLocaleDateString()}</p>
                       <span className={`px-2 py-0.5 text-xs rounded-full ${
-                        trip.status === TripStatus.Confirmed ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                        trip.status === TripStatus.Planned ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"
                       }`}>
                         {trip.status}
                       </span>

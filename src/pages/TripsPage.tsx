@@ -102,7 +102,7 @@ const TripsPage = () => {
             id: trip.id,
             name: trip.name,
             clients: clientNames,
-            status: trip.status,
+            status: trip.status as TripStatus,
             startDate: trip.start_date,
             endDate: trip.end_date,
             isHighPriority: trip.high_priority,
