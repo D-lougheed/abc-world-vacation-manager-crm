@@ -411,17 +411,19 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         newBookingId = newBooking.id;
       }
       
-      // Insert client relations
-      const clientRelations = values.clients.map(clientId => ({
-        booking_id: newBookingId,
-        client_id: clientId
-      }));
-      
-      const { error: clientsError } = await supabase
-        .from('booking_clients')
-        .insert(clientRelations);
+      // Insert client relations - Only if we have a valid booking ID
+      if (newBookingId && values.clients.length > 0) {
+        const clientRelations = values.clients.map(clientId => ({
+          booking_id: newBookingId,
+          client_id: clientId
+        }));
         
-      if (clientsError) throw clientsError;
+        const { error: clientsError } = await supabase
+          .from('booking_clients')
+          .insert(clientRelations);
+          
+        if (clientsError) throw clientsError;
+      }
       
       toast({
         title: "Success",
@@ -431,6 +433,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       navigate(`/bookings/${newBookingId}`);
       
     } catch (error: any) {
+      console.error("Form submission error:", error);
       toast({
         title: "Error",
         description: `Failed to ${bookingId ? 'update' : 'create'} booking: ${error.message}`,

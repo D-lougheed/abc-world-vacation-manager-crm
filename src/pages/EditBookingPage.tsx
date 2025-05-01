@@ -22,13 +22,33 @@ const EditBookingPage = () => {
         
         const { data, error } = await supabase
           .from('bookings')
-          .select('*')
+          .select(`
+            *,
+            vendor:vendor_id (*),
+            service_type:service_type_id (*),
+            booking_clients (client_id)
+          `)
           .eq('id', id)
           .single();
         
         if (error) throw error;
         
-        setBookingData(data);
+        // Transform the data to match the form's expected format
+        const formattedData = {
+          ...data,
+          clients: data.booking_clients.map((bc: any) => bc.client_id),
+          vendor: data.vendor_id,
+          serviceType: data.service_type_id,
+          startDate: new Date(data.start_date),
+          endDate: data.end_date ? new Date(data.end_date) : undefined,
+          commissionRate: data.commission_rate,
+          bookingStatus: data.booking_status,
+          commissionStatus: data.commission_status,
+          isCompleted: data.is_completed,
+          tripId: data.trip_id || "no_trip"
+        };
+        
+        setBookingData(formattedData);
       } catch (error: any) {
         console.error("Error fetching booking data:", error);
         toast({
