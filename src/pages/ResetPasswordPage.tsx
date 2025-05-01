@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plane } from "lucide-react";
+import { Plane, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,34 +17,41 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const loginSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
+const resetPasswordSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  confirmPassword: z.string().min(6, { message: "Confirm password is required" }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-const LoginPage = () => {
-  const { login } = useAuth();
+const ResetPasswordPage = () => {
+  const { updatePassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: "",
       password: "",
+      confirmPassword: "",
     },
   });
 
-  const onSubmit = async (data: LoginFormValues) => {
+  const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
+    setError(null);
     try {
-      await login(data.email, data.password);
-      // Redirect handled by the Auth context
-    } catch (error) {
-      console.error("Login submission error:", error);
+      await updatePassword(data.password);
+      // Redirect is handled in the AuthContext
+    } catch (error: any) {
+      console.error("Password update error:", error);
+      setError(error.message || "Failed to update password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -57,20 +64,28 @@ const LoginPage = () => {
           <div className="rounded-full bg-primary/10 p-3">
             <Plane className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">ABC World Vacation Manager</h1>
-          <p className="text-sm text-muted-foreground">Sign in to your account to continue</p>
+          <h1 className="text-2xl font-bold tracking-tight">Set New Password</h1>
+          <p className="text-sm text-muted-foreground text-center">
+            Enter your new password below
+          </p>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
-              name="email"
+              name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>New Password</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@company.com" {...field} disabled={isLoading} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -79,10 +94,10 @@ const LoginPage = () => {
 
             <FormField
               control={form.control}
-              name="password"
+              name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Confirm New Password</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                   </FormControl>
@@ -95,32 +110,24 @@ const LoginPage = () => {
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="mr-2 h-4 w-4 animate-spin rounded-full border-t-2 border-background"></div>
-                  <span>Signing in...</span>
+                  <span>Updating password...</span>
                 </div>
               ) : (
-                "Sign In"
+                "Update Password"
               )}
             </Button>
           </form>
         </Form>
 
-        <div className="mt-4 text-center text-sm">
-          <Link to="/forgot-password" className="text-primary hover:underline">
-            Forgot password?
+        <div className="mt-6 text-center">
+          <Link to="/login" className="text-primary hover:underline inline-flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to login
           </Link>
-        </div>
-
-        <div className="mt-4 text-center text-sm">
-          <p className="text-muted-foreground">
-            Don't have an account?{" "}
-            <Link to="/register" className="text-primary hover:underline">
-              Register
-            </Link>
-          </p>
         </div>
       </div>
     </div>
   );
 };
 
-export default LoginPage;
+export default ResetPasswordPage;

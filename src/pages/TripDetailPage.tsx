@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -58,8 +57,6 @@ const TripDetailPage = () => {
     switch (status) {
       case TripStatus.Planned:
         return "bg-blue-100 text-blue-800";
-      case TripStatus.Confirmed:
-        return "bg-purple-100 text-purple-800";
       case TripStatus.Ongoing:
         return "bg-amber-100 text-amber-800";
       case TripStatus.Completed:
