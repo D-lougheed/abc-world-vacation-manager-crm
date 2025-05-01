@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -519,26 +518,6 @@ const BookingDetailPage = () => {
                     No documents uploaded yet.
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Payment Timeline</h3>
-              <div className="rounded-md border">
-                <div className="p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm">Service Cost</span>
-                    <span className="font-medium">${booking.cost.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm">Commission ({booking.commissionRate}%)</span>
-                    <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t">
-                    <span className="font-medium">Net to Agency</span>
-                    <span className="font-medium">${(booking.cost - booking.commissionAmount).toLocaleString()}</span>
-                  </div>
-                </div>
               </div>
             </div>
           </CardContent>
