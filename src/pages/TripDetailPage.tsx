@@ -20,13 +20,16 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { TripStatus } from "@/types";
+import { MultiSelect } from "@/components/forms/MultiSelect";
 
 const TripDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [clientsLoading, setClientsLoading] = useState(false);
   const [trip, setTrip] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
+  const [availableClients, setAvailableClients] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("details");
   const [isNewTrip, setIsNewTrip] = useState(false);
@@ -38,9 +41,41 @@ const TripDetailPage = () => {
     highPriority: false,
     description: "",
     notes: "",
+    clients: [] as string[]
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch all available clients
+  useEffect(() => {
+    const fetchAllClients = async () => {
+      try {
+        setClientsLoading(true);
+        const { data, error } = await supabase
+          .from("clients")
+          .select("id, first_name, last_name")
+          .order("first_name");
+
+        if (error) throw error;
+        
+        setAvailableClients(data.map(client => ({
+          value: client.id,
+          label: `${client.first_name} ${client.last_name}`
+        })));
+      } catch (error: any) {
+        console.error("Error fetching clients:", error);
+        toast({
+          title: "Error",
+          description: `Failed to load clients: ${error.message}`,
+          variant: "destructive"
+        });
+      } finally {
+        setClientsLoading(false);
+      }
+    };
+
+    fetchAllClients();
+  }, [toast]);
 
   useEffect(() => {
     // Check if this is a new trip
@@ -59,6 +94,7 @@ const TripDetailPage = () => {
         highPriority: false,
         description: "",
         notes: "",
+        clients: []
       });
       
       return;
@@ -87,15 +123,6 @@ const TripDetailPage = () => {
       }
       
       setTrip(tripData);
-      setFormData({
-        name: tripData.name,
-        startDate: tripData.start_date,
-        endDate: tripData.end_date,
-        status: tripData.status,
-        highPriority: tripData.high_priority,
-        description: tripData.description || "",
-        notes: tripData.notes || "",
-      });
       
       // Fetch client data
       const { data: tripClientData, error: tripClientError } = await supabase
@@ -107,9 +134,9 @@ const TripDetailPage = () => {
         throw tripClientError;
       }
       
+      const clientIds: string[] = tripClientData?.map(tc => tc.client_id) || [];
+
       if (tripClientData && tripClientData.length > 0) {
-        const clientIds = tripClientData.map(tc => tc.client_id);
-        
         const { data: clientsData, error: clientsError } = await supabase
           .from("clients")
           .select("*")
@@ -121,6 +148,17 @@ const TripDetailPage = () => {
         
         setClients(clientsData || []);
       }
+
+      setFormData({
+        name: tripData.name,
+        startDate: tripData.start_date,
+        endDate: tripData.end_date,
+        status: tripData.status,
+        highPriority: tripData.high_priority,
+        description: tripData.description || "",
+        notes: tripData.notes || "",
+        clients: clientIds
+      });
       
       // Fetch bookings associated with this trip
       const { data: bookingsData, error: bookingsError } = await supabase
@@ -166,6 +204,13 @@ const TripDetailPage = () => {
     });
   };
 
+  const handleClientChange = (selectedClients: string[]) => {
+    setFormData({
+      ...formData,
+      clients: selectedClients
+    });
+  };
+
   const handleSaveTrip = async () => {
     try {
       setSaving(true);
@@ -192,6 +237,20 @@ const TripDetailPage = () => {
         
         if (error) throw error;
         tripId = data.id;
+
+        // Save client associations for new trip
+        if (formData.clients.length > 0) {
+          const clientAssociations = formData.clients.map(clientId => ({
+            trip_id: tripId,
+            client_id: clientId
+          }));
+
+          const { error: clientError } = await supabase
+            .from("trip_clients")
+            .insert(clientAssociations);
+
+          if (clientError) throw clientError;
+        }
         
         toast({
           title: "Success",
@@ -208,6 +267,28 @@ const TripDetailPage = () => {
           .eq("id", id);
         
         if (error) throw error;
+        
+        // First, delete existing client associations
+        const { error: deleteError } = await supabase
+          .from("trip_clients")
+          .delete()
+          .eq("trip_id", id);
+          
+        if (deleteError) throw deleteError;
+        
+        // Then add new client associations
+        if (formData.clients.length > 0) {
+          const clientAssociations = formData.clients.map(clientId => ({
+            trip_id: id,
+            client_id: clientId
+          }));
+          
+          const { error: insertError } = await supabase
+            .from("trip_clients")
+            .insert(clientAssociations);
+            
+          if (insertError) throw insertError;
+        }
         
         // Update the trip state
         setTrip({
@@ -344,6 +425,18 @@ const TripDetailPage = () => {
                     <span className="text-sm font-medium">High Priority</span>
                   </label>
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="clients" className="text-sm font-medium">Clients</label>
+                <MultiSelect
+                  options={availableClients}
+                  selected={formData.clients}
+                  onChange={handleClientChange}
+                  placeholder="Select clients..."
+                  loading={clientsLoading}
+                  icon={<Users className="h-4 w-4" />}
+                />
               </div>
               
               <div className="space-y-2">
@@ -633,6 +726,18 @@ const TripDetailPage = () => {
                       <span className="text-sm font-medium">High Priority</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="clients" className="text-sm font-medium">Clients</label>
+                  <MultiSelect
+                    options={availableClients}
+                    selected={formData.clients}
+                    onChange={handleClientChange}
+                    placeholder="Select clients..."
+                    loading={clientsLoading}
+                    icon={<Users className="h-4 w-4" />}
+                  />
                 </div>
                 
                 <div className="space-y-2">

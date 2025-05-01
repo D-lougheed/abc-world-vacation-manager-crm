@@ -37,7 +37,7 @@ const EditBookingPage = () => {
         const formattedData = {
           ...data,
           clients: data.booking_clients.map((bc: any) => bc.client_id),
-          vendor: data.vendor_id,
+          vendor_id: data.vendor_id,
           serviceType: data.service_type_id,
           startDate: new Date(data.start_date),
           endDate: data.end_date ? new Date(data.end_date) : undefined,
