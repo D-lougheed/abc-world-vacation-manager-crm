@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -66,6 +67,16 @@ interface VendorFormData {
   notes?: string;
 }
 
+interface ServiceType {
+  id: string;
+  name: string;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+}
+
 const VendorDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const isNewVendor = id === "new";
@@ -89,13 +100,13 @@ const VendorDetailPage = () => {
     notes: ""
   });
 
-  // State for service types and tags
-  const [serviceTypes, setServiceTypes] = useState<string[]>([]);
+  // State for service types and tags with IDs
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>("");
-  const [availableServiceTypes, setAvailableServiceTypes] = useState<Array<{id: string, name: string}>>([]);
-  const [tags, setTags] = useState<string[]>([]);
+  const [availableServiceTypes, setAvailableServiceTypes] = useState<ServiceType[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>("");
-  const [availableTags, setAvailableTags] = useState<Array<{id: string, name: string}>>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   
   // State for bookings and documents
   const [bookings, setBookings] = useState<any[]>([]);
@@ -160,13 +171,13 @@ const VendorDetailPage = () => {
               const serviceTypeIds = vendorServiceTypes.map(relation => relation.service_type_id);
               const { data: serviceTypesData, error: serviceTypesError } = await supabase
                 .from('service_types')
-                .select('name')
+                .select('id, name')
                 .in('id', serviceTypeIds);
               
               if (serviceTypesError) throw serviceTypesError;
               
               if (serviceTypesData) {
-                setServiceTypes(serviceTypesData.map(st => st.name));
+                setServiceTypes(serviceTypesData);
               }
             }
             
@@ -182,13 +193,13 @@ const VendorDetailPage = () => {
               const tagIds = vendorTags.map(relation => relation.tag_id);
               const { data: tagsData, error: tagsError } = await supabase
                 .from('tags')
-                .select('name')
+                .select('id, name')
                 .in('id', tagIds);
               
               if (tagsError) throw tagsError;
               
               if (tagsData) {
-                setTags(tagsData.map(tag => tag.name));
+                setTags(tagsData);
               }
             }
             
@@ -264,25 +275,31 @@ const VendorDetailPage = () => {
   };
 
   const handleAddServiceType = () => {
-    if (selectedServiceType && !serviceTypes.includes(selectedServiceType)) {
-      setServiceTypes(prev => [...prev, selectedServiceType]);
+    if (selectedServiceType) {
+      const serviceType = availableServiceTypes.find(st => st.id === selectedServiceType);
+      if (serviceType && !serviceTypes.some(st => st.id === serviceType.id)) {
+        setServiceTypes(prev => [...prev, serviceType]);
+      }
       setSelectedServiceType("");
     }
   };
 
   const handleAddTag = () => {
-    if (selectedTag && !tags.includes(selectedTag)) {
-      setTags(prev => [...prev, selectedTag]);
+    if (selectedTag) {
+      const tag = availableTags.find(t => t.id === selectedTag);
+      if (tag && !tags.some(t => t.id === tag.id)) {
+        setTags(prev => [...prev, tag]);
+      }
       setSelectedTag("");
     }
   };
 
-  const handleRemoveServiceType = (serviceType: string) => {
-    setServiceTypes(prev => prev.filter(st => st !== serviceType));
+  const handleRemoveServiceType = (serviceTypeId: string) => {
+    setServiceTypes(prev => prev.filter(st => st.id !== serviceTypeId));
   };
 
-  const handleRemoveTag = (tag: string) => {
-    setTags(prev => prev.filter(t => t !== tag));
+  const handleRemoveTag = (tagId: string) => {
+    setTags(prev => prev.filter(t => t.id !== tagId));
   };
 
   const handleDeleteVendor = async () => {
@@ -400,52 +417,23 @@ const VendorDetailPage = () => {
           }
         }
         
-        // Get the IDs of the service types by name
-        const { data: serviceTypeData, error: serviceTypeError } = await supabase
-          .from('service_types')
-          .select('id, name')
-          .in('name', serviceTypes);
+        // Insert new service type relationships
+        const serviceTypeRelations = serviceTypes.map(st => ({
+          vendor_id: vendorId,
+          service_type_id: st.id
+        }));
         
-        if (serviceTypeError) {
-          console.error('Error fetching service types:', serviceTypeError);
+        const { error: insertError } = await supabase
+          .from('vendor_service_types')
+          .insert(serviceTypeRelations);
+        
+        if (insertError) {
+          console.error('Error adding service types:', insertError);
           toast({
             title: "Warning",
-            description: `Could not retrieve service type IDs: ${serviceTypeError.message}`,
+            description: `Error adding service types: ${insertError.message}`,
             variant: "destructive"
           });
-        } else if (serviceTypeData && serviceTypeData.length > 0) {
-          // Insert new service type relationships one by one
-          let successCount = 0;
-          let failCount = 0;
-          
-          for (const st of serviceTypeData) {
-            try {
-              const { error: insertError } = await supabase
-                .from('vendor_service_types')
-                .insert({
-                  vendor_id: vendorId,
-                  service_type_id: st.id
-                });
-              
-              if (insertError) {
-                console.error(`Error adding service type ${st.name}:`, insertError);
-                failCount++;
-              } else {
-                successCount++;
-              }
-            } catch (error) {
-              console.error(`Exception adding service type ${st.name}:`, error);
-              failCount++;
-            }
-          }
-          
-          if (failCount > 0) {
-            toast({
-              title: "Warning",
-              description: `Added ${successCount} service types, but ${failCount} failed due to permissions.`,
-              variant: "destructive"
-            });
-          }
         }
       }
       
@@ -472,52 +460,23 @@ const VendorDetailPage = () => {
           }
         }
         
-        // Get the IDs of the tags by name
-        const { data: tagData, error: tagError } = await supabase
-          .from('tags')
-          .select('id, name')
-          .in('name', tags);
+        // Insert new tag relationships
+        const tagRelations = tags.map(tag => ({
+          vendor_id: vendorId,
+          tag_id: tag.id
+        }));
         
-        if (tagError) {
-          console.error('Error fetching tags:', tagError);
+        const { error: insertError } = await supabase
+          .from('vendor_tags')
+          .insert(tagRelations);
+        
+        if (insertError) {
+          console.error('Error adding tags:', insertError);
           toast({
             title: "Warning",
-            description: `Could not retrieve tag IDs: ${tagError.message}`,
+            description: `Error adding tags: ${insertError.message}`,
             variant: "destructive"
           });
-        } else if (tagData && tagData.length > 0) {
-          // Insert new tag relationships one by one
-          let successCount = 0;
-          let failCount = 0;
-          
-          for (const tag of tagData) {
-            try {
-              const { error: insertError } = await supabase
-                .from('vendor_tags')
-                .insert({
-                  vendor_id: vendorId,
-                  tag_id: tag.id
-                });
-              
-              if (insertError) {
-                console.error(`Error adding tag ${tag.name}:`, insertError);
-                failCount++;
-              } else {
-                successCount++;
-              }
-            } catch (error) {
-              console.error(`Exception adding tag ${tag.name}:`, error);
-              failCount++;
-            }
-          }
-          
-          if (failCount > 0) {
-            toast({
-              title: "Warning",
-              description: `Added ${successCount} tags, but ${failCount} failed due to permissions.`,
-              variant: "destructive"
-            });
-          }
         }
       }
       
@@ -757,11 +716,11 @@ const VendorDetailPage = () => {
                     <Label>Service Types</Label>
                     <div className="flex flex-wrap gap-2">
                       {serviceTypes.map(type => (
-                        <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none flex items-center gap-1">
-                          {type}
+                        <Badge key={type.id} className="bg-primary/20 text-primary hover:bg-primary/30 border-none flex items-center gap-1">
+                          {type.name}
                           <button 
                             type="button"
-                            onClick={() => handleRemoveServiceType(type)}
+                            onClick={() => handleRemoveServiceType(type.id)}
                             className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
                           >
                             <X className="h-3 w-3" />
@@ -779,7 +738,7 @@ const VendorDetailPage = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {availableServiceTypes.map(type => (
-                            <SelectItem key={type.id} value={type.name}>
+                            <SelectItem key={type.id} value={type.id}>
                               {type.name}
                             </SelectItem>
                           ))}
@@ -801,12 +760,12 @@ const VendorDetailPage = () => {
                     <Label>Tags</Label>
                     <div className="flex flex-wrap gap-2">
                       {tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                        <Badge key={tag.id} variant="secondary" className="flex items-center gap-1">
                           <Tag className="h-3 w-3 mr-1" />
-                          {tag}
+                          {tag.name}
                           <button 
                             type="button"
-                            onClick={() => handleRemoveTag(tag)}
+                            onClick={() => handleRemoveTag(tag.id)}
                             className="ml-1 hover:bg-secondary/80 rounded-full p-0.5"
                           >
                             <X className="h-3 w-3" />
@@ -824,7 +783,7 @@ const VendorDetailPage = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {availableTags.map(tag => (
-                            <SelectItem key={tag.id} value={tag.name}>
+                            <SelectItem key={tag.id} value={tag.id}>
                               {tag.name}
                             </SelectItem>
                           ))}
@@ -895,8 +854,8 @@ const VendorDetailPage = () => {
                     <div className="flex flex-wrap gap-2 mb-4">
                       {serviceTypes.length > 0 ? (
                         serviceTypes.map(type => (
-                          <Badge key={type} className="bg-primary/20 text-primary hover:bg-primary/30 border-none">
-                            {type}
+                          <Badge key={type.id} className="bg-primary/20 text-primary hover:bg-primary/30 border-none">
+                            {type.name}
                           </Badge>
                         ))
                       ) : (
@@ -910,9 +869,9 @@ const VendorDetailPage = () => {
                     <div className="flex flex-wrap gap-2">
                       {tags.length > 0 ? (
                         tags.map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          <Badge key={tag.id} variant="secondary" className="text-xs">
                             <Tag className="h-3 w-3 mr-1" />
-                            {tag}
+                            {tag.name}
                           </Badge>
                         ))
                       ) : (
