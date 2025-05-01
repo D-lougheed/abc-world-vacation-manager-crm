@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -36,7 +35,7 @@ const TripsPage = () => {
   // Dummy data
   const trips = [
     { id: "1", name: "European Adventure", clients: ["Smith Family", "Johnson"], status: TripStatus.Planned, startDate: "2023-06-15", endDate: "2023-06-25", isHighPriority: false, bookingsCount: 4 },
-    { id: "2", name: "Caribbean Cruise", clients: ["Williams Group"], status: TripStatus.Confirmed, startDate: "2023-07-10", endDate: "2023-07-17", isHighPriority: false, bookingsCount: 2 },
+    { id: "2", name: "Caribbean Cruise", clients: ["Williams Group"], status: TripStatus.Ongoing, startDate: "2023-07-10", endDate: "2023-07-17", isHighPriority: false, bookingsCount: 2 },
     { id: "3", name: "African Safari", clients: ["Taylor Party"], status: TripStatus.Completed, startDate: "2023-04-05", endDate: "2023-04-15", isHighPriority: false, bookingsCount: 5 },
     { id: "4", name: "Last-minute NYC Trip", clients: ["Brown Family"], status: TripStatus.Planned, startDate: "2023-05-25", endDate: "2023-05-28", isHighPriority: true, bookingsCount: 3 },
     { id: "5", name: "Tokyo Adventure", clients: ["Wilson"], status: TripStatus.Canceled, startDate: "2023-05-01", endDate: "2023-05-10", isHighPriority: false, bookingsCount: 0 },
@@ -54,10 +53,8 @@ const TripsPage = () => {
     switch (status) {
       case TripStatus.Planned:
         return "bg-blue-100 text-blue-800";
-      case TripStatus.Confirmed:
-        return "bg-purple-100 text-purple-800";
       case TripStatus.Ongoing:
-        return "bg-amber-100 text-amber-800";
+        return "bg-purple-100 text-purple-800";
       case TripStatus.Completed:
         return "bg-green-100 text-green-800";
       case TripStatus.Canceled:
