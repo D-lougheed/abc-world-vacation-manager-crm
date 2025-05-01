@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { 
   Search, 
   Plus,
@@ -251,7 +250,13 @@ const ServiceTypesPage = () => {
           .from('service_type_tags')
           .insert(tagRelations);
         
-        if (tagRelationsError) throw tagRelationsError;
+        if (tagRelationsError) {
+          console.error('Error adding tags:', tagRelationsError);
+          toast({
+            title: "Warning",
+            description: "Service type was created but there was an error adding tags. Please try updating the service type."
+          });
+        }
       }
       
       toast({
@@ -320,7 +325,13 @@ const ServiceTypesPage = () => {
         .delete()
         .eq('service_type_id', selectedServiceType.id);
       
-      if (deleteTagsError) throw deleteTagsError;
+      if (deleteTagsError) {
+        console.error('Error deleting tags:', deleteTagsError);
+        toast({
+          title: "Warning",
+          description: "Service type was updated but there was an error updating tags."
+        });
+      }
       
       // Insert new tag relationships
       if (selectedTagIds.length > 0) {
@@ -333,7 +344,13 @@ const ServiceTypesPage = () => {
           .from('service_type_tags')
           .insert(tagRelations);
         
-        if (tagRelationsError) throw tagRelationsError;
+        if (tagRelationsError) {
+          console.error('Error adding tags:', tagRelationsError);
+          toast({
+            title: "Warning",
+            description: "Service type was updated but there was an error updating tags."
+          });
+        }
       }
       
       toast({
@@ -494,98 +511,100 @@ const ServiceTypesPage = () => {
                 Add Service Type
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Add Service Type</DialogTitle>
-                <DialogDescription>
-                  Create a new service type for vendors. Service types help categorize the services that vendors offer.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="name" className="text-right text-sm font-medium">
-                    Name
-                  </label>
-                  <Input
-                    id="name"
-                    className="col-span-3"
-                    value={newServiceTypeName}
-                    onChange={(e) => setNewServiceTypeName(e.target.value)}
-                    placeholder="Service type name"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label className="text-right text-sm font-medium">
-                    Tags
-                  </label>
-                  <div className="col-span-3">
-                    <div className="flex items-center mb-2">
-                      <Input
-                        value={currentTagInput}
-                        onChange={(e) => setCurrentTagInput(e.target.value)}
-                        placeholder="Add a tag"
-                        className="mr-2"
-                        onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                      />
-                      <Button type="button" onClick={handleAddTag} variant="outline">Add</Button>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {selectedTagIds.map((tagId) => {
-                        const tag = availableTags.find(t => t.id === tagId);
-                        return tag ? (
-                          <Badge key={tagId} variant="outline" className="text-xs flex items-center">
-                            <Tags className="mr-1 h-3 w-3" />
-                            {tag.name}
-                            <Button
-                              variant="ghost"
-                              className="h-4 w-4 p-0 ml-1"
-                              onClick={() => handleRemoveTag(tagId)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        ) : null;
-                      })}
-                      {selectedTagIds.length === 0 && (
-                        <span className="text-sm text-muted-foreground">No tags selected</span>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <label className="text-sm font-medium">Select from existing tags:</label>
-                      <Select 
-                        onValueChange={(value) => {
-                          if (!selectedTagIds.includes(value)) {
-                            setSelectedTagIds([...selectedTagIds, value]);
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select a tag" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableTags
-                            .filter(tag => !selectedTagIds.includes(tag.id))
-                            .map(tag => (
-                              <SelectItem key={tag.id} value={tag.id}>
-                                {tag.name}
-                              </SelectItem>
-                            ))
-                          }
-                        </SelectContent>
-                      </Select>
+            {addDialogOpen && (
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add Service Type</DialogTitle>
+                  <DialogDescription>
+                    Create a new service type for vendors. Service types help categorize the services that vendors offer.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <label htmlFor="name" className="text-right text-sm font-medium">
+                      Name
+                    </label>
+                    <Input
+                      id="name"
+                      className="col-span-3"
+                      value={newServiceTypeName}
+                      onChange={(e) => setNewServiceTypeName(e.target.value)}
+                      placeholder="Service type name"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <label className="text-right text-sm font-medium">
+                      Tags
+                    </label>
+                    <div className="col-span-3">
+                      <div className="flex items-center mb-2">
+                        <Input
+                          value={currentTagInput}
+                          onChange={(e) => setCurrentTagInput(e.target.value)}
+                          placeholder="Add a tag"
+                          className="mr-2"
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                        />
+                        <Button type="button" onClick={handleAddTag} variant="outline">Add</Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedTagIds.map((tagId) => {
+                          const tag = availableTags.find(t => t.id === tagId);
+                          return tag ? (
+                            <Badge key={tagId} variant="outline" className="text-xs flex items-center">
+                              <Tags className="mr-1 h-3 w-3" />
+                              {tag.name}
+                              <Button
+                                variant="ghost"
+                                className="h-4 w-4 p-0 ml-1"
+                                onClick={() => handleRemoveTag(tagId)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          ) : null;
+                        })}
+                        {selectedTagIds.length === 0 && (
+                          <span className="text-sm text-muted-foreground">No tags selected</span>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <label className="text-sm font-medium">Select from existing tags:</label>
+                        <Select 
+                          onValueChange={(value) => {
+                            if (!selectedTagIds.includes(value)) {
+                              setSelectedTagIds([...selectedTagIds, value]);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select a tag" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableTags
+                              .filter(tag => !selectedTagIds.includes(tag.id))
+                              .map(tag => (
+                                <SelectItem key={tag.id} value={tag.id}>
+                                  {tag.name}
+                                </SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="mr-2">
-                  Cancel
-                </Button>
-                <Button type="submit" onClick={handleAddServiceType}>
-                  Save
-                </Button>
-              </DialogFooter>
-            </DialogContent>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="mr-2">
+                    Cancel
+                  </Button>
+                  <Button type="submit" onClick={handleAddServiceType}>
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            )}
           </Dialog>
         </div>
 
@@ -625,8 +644,8 @@ const ServiceTypesPage = () => {
                     </TableRow>
                   ) : filteredServiceTypes.length > 0 ? (
                     filteredServiceTypes.map((serviceType) => (
-                      <>
-                        <TableRow key={serviceType.id}>
+                      <Fragment key={serviceType.id}>
+                        <TableRow>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               <Briefcase className="h-4 w-4 text-primary" />
@@ -661,7 +680,9 @@ const ServiceTypesPage = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                              <Dialog open={editDialogOpen && selectedServiceType?.id === serviceType.id} onOpenChange={(open) => {
+                                if (!open) setEditDialogOpen(false);
+                              }}>
                                 <DialogTrigger asChild>
                                   <Button
                                     variant="ghost"
@@ -671,102 +692,104 @@ const ServiceTypesPage = () => {
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-[425px]">
-                                  <DialogHeader>
-                                    <DialogTitle>Edit Service Type</DialogTitle>
-                                    <DialogDescription>
-                                      Update this service type's details.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  {selectedServiceType && (
-                                    <div className="grid gap-4 py-4">
-                                      <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="edit-name" className="text-right text-sm font-medium">
-                                          Name
-                                        </label>
-                                        <Input
-                                          id="edit-name"
-                                          className="col-span-3"
-                                          value={selectedServiceType.name}
-                                          onChange={(e) => setSelectedServiceType({
-                                            ...selectedServiceType,
-                                            name: e.target.value
-                                          })}
-                                        />
-                                      </div>
-                                      <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right text-sm font-medium">
-                                          Tags
-                                        </label>
-                                        <div className="col-span-3">
-                                          <div className="flex items-center mb-2">
-                                            <Input
-                                              value={currentTagInput}
-                                              onChange={(e) => setCurrentTagInput(e.target.value)}
-                                              placeholder="Add a tag"
-                                              className="mr-2"
-                                              onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                                            />
-                                            <Button type="button" onClick={handleAddTag} variant="outline">Add</Button>
-                                          </div>
-                                          <div className="flex flex-wrap gap-1 mt-2">
-                                            {selectedTagIds.map((tagId) => {
-                                              const tag = availableTags.find(t => t.id === tagId);
-                                              return tag ? (
-                                                <Badge key={tagId} variant="outline" className="text-xs flex items-center">
-                                                  <Tags className="mr-1 h-3 w-3" />
-                                                  {tag.name}
-                                                  <Button
-                                                    variant="ghost"
-                                                    className="h-4 w-4 p-0 ml-1"
-                                                    onClick={() => handleRemoveTag(tagId)}
-                                                  >
-                                                    <X className="h-3 w-3" />
-                                                  </Button>
-                                                </Badge>
-                                              ) : null;
+                                {editDialogOpen && selectedServiceType?.id === serviceType.id && (
+                                  <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                      <DialogTitle>Edit Service Type</DialogTitle>
+                                      <DialogDescription>
+                                        Update this service type's details.
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    {selectedServiceType && (
+                                      <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                          <label htmlFor="edit-name" className="text-right text-sm font-medium">
+                                            Name
+                                          </label>
+                                          <Input
+                                            id="edit-name"
+                                            className="col-span-3"
+                                            value={selectedServiceType.name}
+                                            onChange={(e) => setSelectedServiceType({
+                                              ...selectedServiceType,
+                                              name: e.target.value
                                             })}
-                                            {selectedTagIds.length === 0 && (
-                                              <span className="text-sm text-muted-foreground">No tags selected</span>
-                                            )}
-                                          </div>
-                                          <div className="mt-2">
-                                            <label className="text-sm font-medium">Select from existing tags:</label>
-                                            <Select 
-                                              onValueChange={(value) => {
-                                                if (!selectedTagIds.includes(value)) {
-                                                  setSelectedTagIds([...selectedTagIds, value]);
-                                                }
-                                              }}
-                                            >
-                                              <SelectTrigger className="mt-1">
-                                                <SelectValue placeholder="Select a tag" />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {availableTags
-                                                  .filter(tag => !selectedTagIds.includes(tag.id))
-                                                  .map(tag => (
-                                                    <SelectItem key={tag.id} value={tag.id}>
-                                                      {tag.name}
-                                                    </SelectItem>
-                                                  ))
-                                                }
-                                              </SelectContent>
-                                            </Select>
+                                          />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                          <label className="text-right text-sm font-medium">
+                                            Tags
+                                          </label>
+                                          <div className="col-span-3">
+                                            <div className="flex items-center mb-2">
+                                              <Input
+                                                value={currentTagInput}
+                                                onChange={(e) => setCurrentTagInput(e.target.value)}
+                                                placeholder="Add a tag"
+                                                className="mr-2"
+                                                onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                                              />
+                                              <Button type="button" onClick={handleAddTag} variant="outline">Add</Button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                              {selectedTagIds.map((tagId) => {
+                                                const tag = availableTags.find(t => t.id === tagId);
+                                                return tag ? (
+                                                  <Badge key={tagId} variant="outline" className="text-xs flex items-center">
+                                                    <Tags className="mr-1 h-3 w-3" />
+                                                    {tag.name}
+                                                    <Button
+                                                      variant="ghost"
+                                                      className="h-4 w-4 p-0 ml-1"
+                                                      onClick={() => handleRemoveTag(tagId)}
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </Button>
+                                                  </Badge>
+                                                ) : null;
+                                              })}
+                                              {selectedTagIds.length === 0 && (
+                                                <span className="text-sm text-muted-foreground">No tags selected</span>
+                                              )}
+                                            </div>
+                                            <div className="mt-2">
+                                              <label className="text-sm font-medium">Select from existing tags:</label>
+                                              <Select 
+                                                onValueChange={(value) => {
+                                                  if (!selectedTagIds.includes(value)) {
+                                                    setSelectedTagIds([...selectedTagIds, value]);
+                                                  }
+                                                }}
+                                              >
+                                                <SelectTrigger className="mt-1">
+                                                  <SelectValue placeholder="Select a tag" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {availableTags
+                                                    .filter(tag => !selectedTagIds.includes(tag.id))
+                                                    .map(tag => (
+                                                      <SelectItem key={tag.id} value={tag.id}>
+                                                        {tag.name}
+                                                      </SelectItem>
+                                                    ))
+                                                  }
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
-                                  <DialogFooter>
-                                    <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="mr-2">
-                                      Cancel
-                                    </Button>
-                                    <Button type="submit" onClick={handleEditServiceType}>
-                                      Save Changes
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
+                                    )}
+                                    <DialogFooter>
+                                      <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="mr-2">
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit" onClick={handleEditServiceType}>
+                                        Save Changes
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                )}
                               </Dialog>
                               <Button
                                 variant="ghost"
@@ -796,7 +819,7 @@ const ServiceTypesPage = () => {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     ))
                   ) : (
                     <TableRow>
