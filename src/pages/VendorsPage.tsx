@@ -4,12 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   Briefcase, 
-  Plus,
-  Filter,
   Star,
   DollarSign,
-  Tag,
-  CreditCard,
   Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,9 +27,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
-import { UserRole, Vendor } from "@/types";
+import { UserRole } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import VendorFilters, { VendorFilters as VendorFiltersType } from "@/components/vendors/VendorFilters";
 
 // Modified interface that doesn't extend Vendor to avoid type conflicts
 interface VendorWithDetails {
@@ -56,6 +53,15 @@ const VendorsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [vendors, setVendors] = useState<VendorWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [serviceTypesList, setServiceTypesList] = useState<{ id: string; name: string }[]>([]);
+  const [tagsList, setTagsList] = useState<{ id: string; name: string }[]>([]);
+  const [filters, setFilters] = useState<VendorFiltersType>({
+    serviceTypes: [],
+    priceRange: [1, 5],
+    commissionRange: [0, 100],
+    ratingMinimum: 0,
+    tags: [],
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -64,6 +70,18 @@ const VendorsPage = () => {
     const fetchVendors = async () => {
       try {
         setLoading(true);
+        
+        // Fetch all available service types and tags for filters
+        const [serviceTypesResponse, tagsResponse] = await Promise.all([
+          supabase.from('service_types').select('id, name').order('name'),
+          supabase.from('tags').select('id, name').order('name')
+        ]);
+        
+        if (serviceTypesResponse.error) throw serviceTypesResponse.error;
+        if (tagsResponse.error) throw tagsResponse.error;
+        
+        setServiceTypesList(serviceTypesResponse.data || []);
+        setTagsList(tagsResponse.data || []);
         
         // Fetch vendors
         const { data: vendorsData, error: vendorsError } = await supabase
@@ -148,13 +166,49 @@ const VendorsPage = () => {
     fetchVendors();
   }, [toast]);
 
-  // Filter vendors based on search term
-  const filteredVendors = vendors.filter((vendor) => 
-    vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.serviceTypes.some(type => type.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    vendor.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Handle filter changes
+  const handleFilterChange = (newFilters: VendorFiltersType) => {
+    setFilters(newFilters);
+  };
+
+  // Filter vendors based on search term and filters
+  const filteredVendors = vendors.filter((vendor) => {
+    // Text search filter
+    const textMatch = 
+      vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vendor.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vendor.serviceTypes.some(type => type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      vendor.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (!textMatch) return false;
+    
+    // Service type filter
+    if (filters.serviceTypes.length > 0 && !vendor.serviceTypes.some(type => filters.serviceTypes.includes(type))) {
+      return false;
+    }
+    
+    // Price range filter
+    if (vendor.priceRange < filters.priceRange[0] || vendor.priceRange > filters.priceRange[1]) {
+      return false;
+    }
+    
+    // Commission rate filter
+    if (vendor.commissionRate < filters.commissionRange[0] || vendor.commissionRate > filters.commissionRange[1]) {
+      return false;
+    }
+    
+    // Rating filter
+    if (vendor.rating < filters.ratingMinimum) {
+      return false;
+    }
+    
+    // Tags filter
+    if (filters.tags.length > 0 && !vendor.tags.some(tag => filters.tags.includes(tag))) {
+      return false;
+    }
+    
+    return true;
+  });
 
   // Function to render price range as dollar signs
   const renderPriceRange = (range: number) => {
@@ -213,10 +267,12 @@ const VendorsPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="w-full md:w-auto">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
+            <VendorFilters 
+              serviceTypes={serviceTypesList}
+              tags={tagsList}
+              onFilterChange={handleFilterChange}
+              activeFilters={filters}
+            />
           </div>
 
           <div className="rounded-md border">
@@ -256,7 +312,7 @@ const VendorsPage = () => {
                       <TableCell>{renderPriceRange(vendor.priceRange)}</TableCell>
                       <TableCell className="font-medium text-primary">
                         <div className="flex items-center">
-                          <CreditCard className="mr-1 h-4 w-4" />
+                          <DollarSign className="mr-1 h-4 w-4" />
                           {vendor.commissionRate}%
                         </div>
                       </TableCell>
@@ -273,7 +329,7 @@ const VendorsPage = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No vendors found. Try a different search term or add a new vendor.
+                      No vendors found. Try a different search term or adjust your filters.
                     </TableCell>
                   </TableRow>
                 )}
