@@ -297,15 +297,26 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           
           const clientIds = bookingClients.map(relation => relation.client_id);
           
+          // Convert time to 12-hour format if needed
+          const convertTo12HourFormat = (time24: string | null): string => {
+            if (!time24) return "";
+            
+            const [hours, minutes] = time24.split(':').map(Number);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
+            
+            return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+          };
+          
           // Set form values
           form.reset({
             clients: clientIds,
             vendor: booking.vendor_id,
             serviceType: booking.service_type_id,
             startDate: new Date(booking.start_date),
-            startTime: booking.start_time || "",
+            startTime: booking.start_time ? convertTo12HourFormat(booking.start_time) : "",
             endDate: booking.end_date ? new Date(booking.end_date) : undefined,
-            endTime: booking.end_time || "",
+            endTime: booking.end_time ? convertTo12HourFormat(booking.end_time) : "",
             location: booking.location,
             cost: booking.cost,
             commissionRate: booking.commission_rate,
