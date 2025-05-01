@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, 
@@ -27,19 +28,103 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TripStatus } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface TripClient {
+  first_name: string;
+  last_name: string;
+}
+
+interface Trip {
+  id: string;
+  name: string;
+  clients: string[];
+  status: TripStatus;
+  startDate: string;
+  endDate: string;
+  isHighPriority: boolean;
+  bookingsCount: number;
+}
 
 const TripsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // Dummy data
-  const trips = [
-    { id: "1", name: "European Adventure", clients: ["Smith Family", "Johnson"], status: TripStatus.Planned, startDate: "2023-06-15", endDate: "2023-06-25", isHighPriority: false, bookingsCount: 4 },
-    { id: "2", name: "Caribbean Cruise", clients: ["Williams Group"], status: TripStatus.Ongoing, startDate: "2023-07-10", endDate: "2023-07-17", isHighPriority: false, bookingsCount: 2 },
-    { id: "3", name: "African Safari", clients: ["Taylor Party"], status: TripStatus.Completed, startDate: "2023-04-05", endDate: "2023-04-15", isHighPriority: false, bookingsCount: 5 },
-    { id: "4", name: "Last-minute NYC Trip", clients: ["Brown Family"], status: TripStatus.Planned, startDate: "2023-05-25", endDate: "2023-05-28", isHighPriority: true, bookingsCount: 3 },
-    { id: "5", name: "Tokyo Adventure", clients: ["Wilson"], status: TripStatus.Canceled, startDate: "2023-05-01", endDate: "2023-05-10", isHighPriority: false, bookingsCount: 0 },
-  ];
+  // Fetch trips from Supabase
+  useEffect(() => {
+    const fetchTrips = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch trips
+        const { data: tripsData, error: tripsError } = await supabase
+          .from('trips')
+          .select('*')
+          .order('start_date', { ascending: false });
+        
+        if (tripsError) throw tripsError;
+        
+        // For each trip, fetch associated clients and booking count
+        const tripsWithDetails = await Promise.all(tripsData.map(async (trip) => {
+          // Fetch clients for this trip
+          const { data: tripClients, error: tripClientsError } = await supabase
+            .from('trip_clients')
+            .select('client_id')
+            .eq('trip_id', trip.id);
+          
+          if (tripClientsError) throw tripClientsError;
+          
+          let clientNames: string[] = [];
+          if (tripClients.length > 0) {
+            const clientIds = tripClients.map(relation => relation.client_id);
+            const { data: clientsData, error: clientsError } = await supabase
+              .from('clients')
+              .select('first_name, last_name')
+              .in('id', clientIds);
+            
+            if (clientsError) throw clientsError;
+            clientNames = clientsData.map(client => `${client.first_name} ${client.last_name}`);
+          }
+          
+          // Count bookings for this trip
+          const { count: bookingsCount, error: bookingsCountError } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('trip_id', trip.id);
+          
+          if (bookingsCountError) throw bookingsCountError;
+          
+          return {
+            id: trip.id,
+            name: trip.name,
+            clients: clientNames,
+            status: trip.status,
+            startDate: trip.start_date,
+            endDate: trip.end_date,
+            isHighPriority: trip.high_priority,
+            bookingsCount: bookingsCount || 0
+          };
+        }));
+        
+        setTrips(tripsWithDetails);
+      } catch (error: any) {
+        console.error('Error fetching trips:', error);
+        toast({
+          title: "Failed to load trips",
+          description: error.message || "There was an error loading trip data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrips();
+  }, [toast]);
 
   // Filter trips based on search term
   const filteredTrips = trips.filter((trip) => {
@@ -104,43 +189,50 @@ const TripsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTrips.map((trip) => (
-                  <TableRow 
-                    key={trip.id} 
-                    className={`cursor-pointer hover:bg-muted/50 ${trip.isHighPriority ? 'bg-amber-50' : ''}`} 
-                    onClick={() => navigate(`/trips/${trip.id}`)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center">
-                        {trip.isHighPriority && (
-                          <AlertTriangle className="h-4 w-4 text-amber-500 mr-2" />
-                        )}
-                        <span className="font-medium">{trip.name}</span>
-                      </div>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Loading trips...
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>{trip.clients.join(", ")}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeStyle(trip.status)}>
-                        {trip.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <CalendarRange className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>
-                          {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{trip.bookingsCount}</TableCell>
                   </TableRow>
-                ))}
-                {filteredTrips.length === 0 && (
+                ) : filteredTrips.length > 0 ? (
+                  filteredTrips.map((trip) => (
+                    <TableRow 
+                      key={trip.id} 
+                      className={`cursor-pointer hover:bg-muted/50 ${trip.isHighPriority ? 'bg-amber-50' : ''}`} 
+                      onClick={() => navigate(`/trips/${trip.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center">
+                          {trip.isHighPriority && (
+                            <AlertTriangle className="h-4 w-4 text-amber-500 mr-2" />
+                          )}
+                          <span className="font-medium">{trip.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 text-muted-foreground mr-2" />
+                          <span>{trip.clients.join(", ")}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusBadgeStyle(trip.status)}>
+                          {trip.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <CalendarRange className="h-4 w-4 text-muted-foreground mr-2" />
+                          <span>
+                            {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{trip.bookingsCount}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No trips found. Try a different search term or create a new trip.

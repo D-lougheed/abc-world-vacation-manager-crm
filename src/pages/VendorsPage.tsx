@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, 
@@ -31,19 +31,120 @@ import {
 import { Badge } from "@/components/ui/badge";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { UserRole } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface ServiceType {
+  id: string;
+  name: string;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+}
+
+interface Vendor {
+  id: string;
+  name: string;
+  contactPerson: string;
+  serviceTypes: string[];
+  tags: string[];
+  priceRange: number;
+  commissionRate: number;
+  rating: number;
+}
 
 const VendorsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // Dummy data - in a real app, this would come from your database
-  const vendors = [
-    { id: "1", name: "Marriott Hotels", contactPerson: "Sarah Johnson", serviceTypes: ["Accommodation"], tags: ["Luxury", "Business"], priceRange: 4, commissionRate: 10, rating: 4.8 },
-    { id: "2", name: "Delta Airlines", contactPerson: "Michael Chen", serviceTypes: ["Transportation", "Flights"], tags: ["International", "Domestic"], priceRange: 3, commissionRate: 8, rating: 4.5 },
-    { id: "3", name: "Hertz Car Rental", contactPerson: "David Wilson", serviceTypes: ["Transportation"], tags: ["Luxury", "Economy"], priceRange: 3, commissionRate: 12, rating: 4.2 },
-    { id: "4", name: "Royal Caribbean", contactPerson: "Emma Davis", serviceTypes: ["Cruise"], tags: ["Luxury", "All-Inclusive"], priceRange: 5, commissionRate: 15, rating: 4.9 },
-    { id: "5", name: "City Tours Inc", contactPerson: "Robert Brown", serviceTypes: ["Activities", "Tours"], tags: ["Group", "Private"], priceRange: 2, commissionRate: 18, rating: 4.6 },
-  ];
+  // Fetch vendors from Supabase
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch vendors
+        const { data: vendorsData, error: vendorsError } = await supabase
+          .from('vendors')
+          .select('*')
+          .order('name');
+        
+        if (vendorsError) throw vendorsError;
+        
+        // For each vendor, fetch associated service types and tags
+        const vendorsWithDetails = await Promise.all(vendorsData.map(async (vendor) => {
+          // Fetch service types for this vendor
+          const { data: vendorServiceTypes, error: vendorServiceTypesError } = await supabase
+            .from('vendor_service_types')
+            .select('service_type_id')
+            .eq('vendor_id', vendor.id);
+          
+          if (vendorServiceTypesError) throw vendorServiceTypesError;
+          
+          let serviceTypes: string[] = [];
+          if (vendorServiceTypes.length > 0) {
+            const serviceTypeIds = vendorServiceTypes.map(relation => relation.service_type_id);
+            const { data: serviceTypesData, error: serviceTypesError } = await supabase
+              .from('service_types')
+              .select('name')
+              .in('id', serviceTypeIds);
+            
+            if (serviceTypesError) throw serviceTypesError;
+            serviceTypes = serviceTypesData.map(st => st.name);
+          }
+          
+          // Fetch tags for this vendor
+          const { data: vendorTags, error: vendorTagsError } = await supabase
+            .from('vendor_tags')
+            .select('tag_id')
+            .eq('vendor_id', vendor.id);
+          
+          if (vendorTagsError) throw vendorTagsError;
+          
+          let tags: string[] = [];
+          if (vendorTags.length > 0) {
+            const tagIds = vendorTags.map(relation => relation.tag_id);
+            const { data: tagsData, error: tagsError } = await supabase
+              .from('tags')
+              .select('name')
+              .in('id', tagIds);
+            
+            if (tagsError) throw tagsError;
+            tags = tagsData.map(tag => tag.name);
+          }
+          
+          return {
+            id: vendor.id,
+            name: vendor.name,
+            contactPerson: vendor.contact_person,
+            serviceTypes: serviceTypes,
+            tags: tags,
+            priceRange: vendor.price_range,
+            commissionRate: vendor.commission_rate,
+            rating: vendor.rating
+          };
+        }));
+        
+        setVendors(vendorsWithDetails);
+      } catch (error: any) {
+        console.error('Error fetching vendors:', error);
+        toast({
+          title: "Failed to load vendors",
+          description: error.message || "There was an error loading vendor data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVendors();
+  }, [toast]);
 
   // Filter vendors based on search term
   const filteredVendors = vendors.filter((vendor) => 
@@ -129,35 +230,42 @@ const VendorsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendors.map((vendor) => (
-                  <TableRow key={vendor.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/vendors/${vendor.id}`)}>
-                    <TableCell>
-                      <div className="font-medium">{vendor.name}</div>
-                      <div className="text-sm text-muted-foreground">{vendor.contactPerson}</div>
-                    </TableCell>
-                    <TableCell>
-                      {vendor.serviceTypes.map((type) => (
-                        <Badge key={type} variant="outline" className="mr-1 mb-1">{type}</Badge>
-                      ))}
-                    </TableCell>
-                    <TableCell>{renderPriceRange(vendor.priceRange)}</TableCell>
-                    <TableCell className="font-medium text-primary">
-                      <div className="flex items-center">
-                        <CreditCard className="mr-1 h-4 w-4" />
-                        {vendor.commissionRate}%
-                      </div>
-                    </TableCell>
-                    <TableCell>{renderRating(vendor.rating)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {vendor.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                        ))}
-                      </div>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Loading vendors...
                     </TableCell>
                   </TableRow>
-                ))}
-                {filteredVendors.length === 0 && (
+                ) : filteredVendors.length > 0 ? (
+                  filteredVendors.map((vendor) => (
+                    <TableRow key={vendor.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/vendors/${vendor.id}`)}>
+                      <TableCell>
+                        <div className="font-medium">{vendor.name}</div>
+                        <div className="text-sm text-muted-foreground">{vendor.contactPerson}</div>
+                      </TableCell>
+                      <TableCell>
+                        {vendor.serviceTypes.map((type) => (
+                          <Badge key={type} variant="outline" className="mr-1 mb-1">{type}</Badge>
+                        ))}
+                      </TableCell>
+                      <TableCell>{renderPriceRange(vendor.priceRange)}</TableCell>
+                      <TableCell className="font-medium text-primary">
+                        <div className="flex items-center">
+                          <CreditCard className="mr-1 h-4 w-4" />
+                          {vendor.commissionRate}%
+                        </div>
+                      </TableCell>
+                      <TableCell>{renderRating(vendor.rating)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {vendor.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No vendors found. Try a different search term or add a new vendor.

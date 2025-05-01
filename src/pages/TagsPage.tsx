@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   Tags,
@@ -28,28 +28,78 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface Tag {
+  id: string;
+  name: string;
+  usageCount: number;
+}
 
 const TagsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Dummy data
-  const tags = [
-    { id: "1", name: "Luxury", usageCount: 24 },
-    { id: "2", name: "Budget", usageCount: 17 },
-    { id: "3", name: "Family-Friendly", usageCount: 19 },
-    { id: "4", name: "Business", usageCount: 12 },
-    { id: "5", name: "Adventure", usageCount: 15 },
-    { id: "6", name: "Cultural", usageCount: 9 },
-    { id: "7", name: "Beach", usageCount: 22 },
-    { id: "8", name: "Mountain", usageCount: 11 },
-    { id: "9", name: "City", usageCount: 14 },
-    { id: "10", name: "All-Inclusive", usageCount: 20 },
-    { id: "11", name: "Spa", usageCount: 8 },
-    { id: "12", name: "Golf", usageCount: 6 },
-    { id: "13", name: "Ski", usageCount: 7 },
-    { id: "14", name: "Cruise", usageCount: 10 },
-    { id: "15", name: "Safari", usageCount: 5 }
-  ];
+  // Fetch tags from Supabase
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch tags
+        const { data: tagsData, error: tagsError } = await supabase
+          .from('tags')
+          .select('*')
+          .order('name');
+        
+        if (tagsError) throw tagsError;
+        
+        // For each tag, count its usage
+        const tagsWithUsage = await Promise.all(tagsData.map(async (tag) => {
+          // Count service_type_tags usage
+          const { count: serviceTypeTagsCount, error: serviceTypeTagsError } = await supabase
+            .from('service_type_tags')
+            .select('tag_id', { count: 'exact', head: true })
+            .eq('tag_id', tag.id);
+          
+          if (serviceTypeTagsError) throw serviceTypeTagsError;
+          
+          // Count vendor_tags usage
+          const { count: vendorTagsCount, error: vendorTagsError } = await supabase
+            .from('vendor_tags')
+            .select('tag_id', { count: 'exact', head: true })
+            .eq('tag_id', tag.id);
+          
+          if (vendorTagsError) throw vendorTagsError;
+          
+          // Total usage count
+          const usageCount = (serviceTypeTagsCount || 0) + (vendorTagsCount || 0);
+          
+          return {
+            id: tag.id,
+            name: tag.name,
+            usageCount: usageCount
+          };
+        }));
+        
+        setTags(tagsWithUsage);
+      } catch (error: any) {
+        console.error('Error fetching tags:', error);
+        toast({
+          title: "Failed to load tags",
+          description: error.message || "There was an error loading the tag data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTags();
+  }, [toast]);
 
   // Filter tags based on search term
   const filteredTags = tags.filter((tag) => {
@@ -58,6 +108,13 @@ const TagsPage = () => {
 
   // Sort tags by usage count in descending order
   const sortedTags = [...filteredTags].sort((a, b) => b.usageCount - a.usageCount);
+
+  // Find most used tag
+  const mostUsedTag = tags.length > 0 ? tags.reduce((prev, current) => 
+    (prev.usageCount > current.usageCount) ? prev : current) : null;
+
+  // Calculate total usage
+  const totalUsage = tags.reduce((sum, tag) => sum + tag.usageCount, 0);
 
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
@@ -99,23 +156,25 @@ const TagsPage = () => {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardContent className="p-4 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Most Used Tag</p>
-                    <p className="text-2xl font-bold">{tags.sort((a, b) => b.usageCount - a.usageCount)[0].name}</p>
-                  </div>
-                  <Badge variant="secondary" className="text-xs p-2">
-                    Used {tags.sort((a, b) => b.usageCount - a.usageCount)[0].usageCount} times
-                  </Badge>
-                </CardContent>
-              </Card>
+              {mostUsedTag && (
+                <Card>
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Most Used Tag</p>
+                      <p className="text-2xl font-bold">{mostUsedTag.name}</p>
+                    </div>
+                    <Badge variant="secondary" className="text-xs p-2">
+                      Used {mostUsedTag.usageCount} times
+                    </Badge>
+                  </CardContent>
+                </Card>
+              )}
               
               <Card>
                 <CardContent className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Usage</p>
-                    <p className="text-2xl font-bold">{tags.reduce((sum, tag) => sum + tag.usageCount, 0)}</p>
+                    <p className="text-2xl font-bold">{totalUsage}</p>
                   </div>
                   <Tag className="h-8 w-8 text-primary" />
                 </CardContent>
@@ -132,30 +191,37 @@ const TagsPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedTags.map((tag) => (
-                    <TableRow key={tag.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            <Tag className="mr-1 h-3 w-3" />
-                            {tag.name}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>{tag.usageCount} uses</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="ghost" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        Loading tags...
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {filteredTags.length === 0 && (
+                  ) : sortedTags.length > 0 ? (
+                    sortedTags.map((tag) => (
+                      <TableRow key={tag.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              <Tag className="mr-1 h-3 w-3" />
+                              {tag.name}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>{tag.usageCount} uses</TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="icon">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                         No tags found. Try a different search term or add a new tag.

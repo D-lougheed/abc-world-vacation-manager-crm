@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   Plus,
@@ -28,54 +28,99 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface Tag {
+  id: string;
+  name: string;
+}
+
+interface ServiceType {
+  id: string;
+  name: string;
+  tags: Tag[];
+  vendorCount: number;
+}
 
 const ServiceTypesPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Dummy data
-  const serviceTypes = [
-    { 
-      id: "1", 
-      name: "Flight", 
-      tags: ["Domestic", "International", "Economy", "Business", "First Class"],
-      vendorCount: 12
-    },
-    { 
-      id: "2", 
-      name: "Accommodation", 
-      tags: ["Hotel", "Resort", "Villa", "Luxury", "Budget", "Family-Friendly"],
-      vendorCount: 18
-    },
-    { 
-      id: "3", 
-      name: "Cruise", 
-      tags: ["Ocean", "River", "Luxury", "Adventure"],
-      vendorCount: 6
-    },
-    { 
-      id: "4", 
-      name: "Tour", 
-      tags: ["Guided", "Self-Guided", "Cultural", "Adventure", "Food"],
-      vendorCount: 9
-    },
-    { 
-      id: "5", 
-      name: "Transportation", 
-      tags: ["Car Rental", "Transfer", "Chauffeur", "Luxury"],
-      vendorCount: 14
-    },
-    { 
-      id: "6", 
-      name: "Insurance", 
-      tags: ["Travel Insurance", "Medical", "Cancellation"],
-      vendorCount: 3
-    },
-  ];
+  // Fetch service types from Supabase
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch service types
+        const { data: serviceTypesData, error: serviceTypesError } = await supabase
+          .from('service_types')
+          .select('*')
+          .order('name');
+        
+        if (serviceTypesError) throw serviceTypesError;
+        
+        // For each service type, fetch associated tags and vendor count
+        const serviceTypesWithDetails = await Promise.all(serviceTypesData.map(async (serviceType) => {
+          // Fetch tags for this service type
+          const { data: tagRelations, error: tagRelationsError } = await supabase
+            .from('service_type_tags')
+            .select('tag_id')
+            .eq('service_type_id', serviceType.id);
+          
+          if (tagRelationsError) throw tagRelationsError;
+          
+          let tags: Tag[] = [];
+          if (tagRelations.length > 0) {
+            const tagIds = tagRelations.map(relation => relation.tag_id);
+            const { data: tagsData, error: tagsError } = await supabase
+              .from('tags')
+              .select('*')
+              .in('id', tagIds);
+            
+            if (tagsError) throw tagsError;
+            tags = tagsData;
+          }
+          
+          // Count vendors using this service type
+          const { count: vendorCount, error: vendorCountError } = await supabase
+            .from('vendor_service_types')
+            .select('vendor_id', { count: 'exact', head: true })
+            .eq('service_type_id', serviceType.id);
+          
+          if (vendorCountError) throw vendorCountError;
+          
+          return {
+            id: serviceType.id,
+            name: serviceType.name,
+            tags: tags,
+            vendorCount: vendorCount || 0
+          };
+        }));
+        
+        setServiceTypes(serviceTypesWithDetails);
+      } catch (error: any) {
+        console.error('Error fetching service types:', error);
+        toast({
+          title: "Failed to load service types",
+          description: error.message || "There was an error loading the service type data",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServiceTypes();
+  }, [toast]);
 
   // Filter service types based on search term
   const filteredServiceTypes = serviceTypes.filter((serviceType) => {
     const name = serviceType.name.toLowerCase();
-    const tags = serviceType.tags.join(" ").toLowerCase();
+    const tags = serviceType.tags.map(tag => tag.name).join(" ").toLowerCase();
     return name.includes(searchTerm.toLowerCase()) || tags.includes(searchTerm.toLowerCase());
   });
 
@@ -119,38 +164,45 @@ const ServiceTypesPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredServiceTypes.map((serviceType) => (
-                    <TableRow key={serviceType.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="h-4 w-4 text-primary" />
-                          <span>{serviceType.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {serviceType.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              <Tags className="mr-1 h-3 w-3" />
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>{serviceType.vendorCount}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="ghost" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        Loading service types...
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {filteredServiceTypes.length === 0 && (
+                  ) : filteredServiceTypes.length > 0 ? (
+                    filteredServiceTypes.map((serviceType) => (
+                      <TableRow key={serviceType.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4 text-primary" />
+                            <span>{serviceType.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {serviceType.tags.map((tag) => (
+                              <Badge key={tag.id} variant="outline" className="text-xs">
+                                <Tags className="mr-1 h-3 w-3" />
+                                {tag.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>{serviceType.vendorCount}</TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="icon">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         No service types found. Try a different search term or add a new service type.
