@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -45,9 +46,11 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { BookingStatus, CommissionStatus } from "@/types";
+import { BookingStatus, CommissionStatus, UserRole } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelect } from "./MultiSelect";
+import { useAuth } from "@/contexts/AuthContext";
+import RoleBasedComponent from "@/components/RoleBasedComponent";
 
 // Schema for form validation
 const bookingSchema = z.object({
@@ -61,6 +64,7 @@ const bookingSchema = z.object({
   commissionRate: z.number().min(0, { message: "Commission rate cannot be negative" }),
   notes: z.string().optional(),
   bookingStatus: z.enum(["Pending", "Confirmed", "Canceled"]),
+  commissionStatus: z.enum(["Unreceived", "Received", "Canceled", "Completed"]),
   isCompleted: z.boolean().default(false),
   tripId: z.string().optional(),
 });
@@ -80,6 +84,7 @@ interface SelectOption {
 const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // State for dropdown options
   const [clientOptions, setClientOptions] = useState<SelectOption[]>([]);
@@ -101,6 +106,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     commissionRate: 10,
     notes: "",
     bookingStatus: BookingStatus.Pending,
+    commissionStatus: CommissionStatus.Unreceived,
     isCompleted: false,
     tripId: undefined,
   };
@@ -238,6 +244,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             commissionRate: booking.commission_rate,
             notes: booking.notes || "",
             bookingStatus: booking.booking_status,
+            commissionStatus: booking.commission_status,
             isCompleted: booking.is_completed,
             tripId: booking.trip_id || "no_trip",
           });
@@ -360,6 +367,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             commission_rate: values.commissionRate,
             commission_amount: commissionAmount,
             booking_status: values.bookingStatus,
+            commission_status: values.commissionStatus,
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
@@ -390,8 +398,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             commission_rate: values.commissionRate,
             commission_amount: commissionAmount,
             booking_status: values.bookingStatus,
+            commission_status: values.commissionStatus,
             is_completed: values.isCompleted,
-            commission_status: CommissionStatus.Unreceived,
             notes: values.notes || null,
             trip_id: tripId,
             agent_id: user.id,
@@ -443,13 +451,17 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     }
   };
 
-  const getStatusBadgeStyle = (status: BookingStatus) => {
+  const getStatusBadgeStyle = (status: BookingStatus | CommissionStatus) => {
     switch (status) {
       case BookingStatus.Confirmed:
+      case CommissionStatus.Received:
+      case CommissionStatus.Completed:
         return "bg-green-100 text-green-800";
       case BookingStatus.Pending:
+      case CommissionStatus.Unreceived:
         return "bg-yellow-100 text-yellow-800";
       case BookingStatus.Canceled:
+      case CommissionStatus.Canceled:
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -805,6 +817,43 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   </FormItem>
                 )}
               />
+
+              {/* Commission Status - only visible to Admin and SuperAdmin */}
+              <RoleBasedComponent requiredRole={UserRole.Admin}>
+                <FormField
+                  control={form.control}
+                  name="commissionStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Commission Status</FormLabel>
+                      <Select 
+                        disabled={loading} 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.values(CommissionStatus).map((status) => (
+                            <SelectItem key={status} value={status}>
+                              <div className="flex items-center">
+                                <Badge className={getStatusBadgeStyle(status as CommissionStatus)}>
+                                  {status}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                </FormField>
+              </RoleBasedComponent>
               
               <FormField
                 control={form.control}
