@@ -176,7 +176,7 @@ export const useVendorActions = (
             }
           }
           
-          // For existing vendors, handle tags
+          // For existing vendors, handle tags - FIX HERE
           // First delete existing relationships
           const { error: deleteTagError } = await supabase
             .from('vendor_tags')
@@ -190,27 +190,28 @@ export const useVendorActions = (
               description: `Error removing existing tags: ${deleteTagError.message}`,
               variant: "destructive"
             });
-          }
-          
-          // Only insert if there are tags to add
-          if (tags.length > 0) {
-            // Then insert new tag relationships
-            const tagRelations = tags.map(tag => ({
-              vendor_id: finalVendorId,
-              tag_id: tag.id
-            }));
-            
-            const { error: insertTagError } = await supabase
-              .from('vendor_tags')
-              .insert(tagRelations);
-            
-            if (insertTagError) {
-              console.error('Error adding tags:', insertTagError);
-              toast({
-                title: "Warning",
-                description: `Error adding tags: ${insertTagError.message}`,
-                variant: "destructive"
-              });
+          } else {
+            // Only insert if there are tags to add and we successfully deleted the old ones
+            if (tags.length > 0) {
+              // Create unique tag relations to avoid constraint violations
+              const tagRelations = tags.map(tag => ({
+                vendor_id: finalVendorId,
+                tag_id: tag.id
+              }));
+              
+              // Insert all tag relations at once
+              const { error: insertTagError } = await supabase
+                .from('vendor_tags')
+                .insert(tagRelations);
+              
+              if (insertTagError) {
+                console.error('Error adding tags:', insertTagError);
+                toast({
+                  title: "Warning",
+                  description: `Error adding tags: ${insertTagError.message}`,
+                  variant: "destructive"
+                });
+              }
             }
           }
         }
