@@ -74,6 +74,36 @@ export type Database = {
           },
         ]
       }
+      booking_tags: {
+        Row: {
+          booking_id: string
+          tag_id: string
+        }
+        Insert: {
+          booking_id: string
+          tag_id: string
+        }
+        Update: {
+          booking_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_tags_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           agent_id: string
@@ -389,6 +419,36 @@ export type Database = {
           },
           {
             foreignKeyName: "trip_clients_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_tags: {
+        Row: {
+          tag_id: string
+          trip_id: string
+        }
+        Insert: {
+          tag_id: string
+          trip_id: string
+        }
+        Update: {
+          tag_id?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_tags_trip_id_fkey"
             columns: ["trip_id"]
             isOneToOne: false
             referencedRelation: "trips"

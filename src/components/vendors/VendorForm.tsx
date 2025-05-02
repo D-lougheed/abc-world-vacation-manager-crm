@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import RoleBasedComponent from "@/components/RoleBasedComponent";
+import { UserRole } from "@/types";
 
 export interface VendorFormData {
   name: string;
@@ -77,6 +79,7 @@ const VendorForm = ({
   const [availableServiceTypes, setAvailableServiceTypes] = useState<ServiceType[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>("");
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [newServiceTypeName, setNewServiceTypeName] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -171,6 +174,50 @@ const VendorForm = ({
     return Array(5).fill(0).map((_, i) => (
       <span key={i} className={`text-lg ${i < range ? "text-primary" : "text-muted-foreground/30"}`}>$</span>
     ));
+  };
+
+  // Function to create a new service type (admin only)
+  const handleCreateServiceType = async () => {
+    if (!newServiceTypeName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a service type name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Insert the new service type
+      const { data: newServiceType, error } = await supabase
+        .from('service_types')
+        .insert([{ name: newServiceTypeName.trim() }])
+        .select('id, name')
+        .single();
+      
+      if (error) throw error;
+      
+      // Update the available service types
+      setAvailableServiceTypes(prev => [...prev, newServiceType]);
+      
+      // Select the new service type
+      setSelectedServiceType(newServiceType.id);
+      
+      // Clear the input
+      setNewServiceTypeName("");
+      
+      toast({
+        title: "Success",
+        description: "New service type created successfully"
+      });
+    } catch (error: any) {
+      console.error('Error creating service type:', error);
+      toast({
+        title: "Failed to create service type",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -337,6 +384,30 @@ const VendorForm = ({
             Add
           </Button>
         </div>
+
+        {/* Admin-only service type creation */}
+        <RoleBasedComponent requiredRole={UserRole.Admin}>
+          <div className="mt-2 border-t pt-2">
+            <p className="text-sm text-muted-foreground mb-2">Admin: Create new service type</p>
+            <div className="flex gap-2">
+              <Input
+                value={newServiceTypeName}
+                onChange={(e) => setNewServiceTypeName(e.target.value)}
+                placeholder="New service type name"
+                className="flex-1"
+              />
+              <Button 
+                type="button" 
+                size="sm"
+                onClick={handleCreateServiceType}
+                disabled={!newServiceTypeName.trim()}
+                variant="outline"
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+        </RoleBasedComponent>
       </div>
 
       {/* Tags Selection */}
