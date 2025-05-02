@@ -78,46 +78,14 @@ export const useVendorActions = (
         if (insertError) throw insertError;
         finalVendorId = newVendor.id;
         
-        // Save service types for this new vendor
+        // Create service type relationships for new vendor
         if (serviceTypes.length > 0 && finalVendorId) {
-          const serviceTypeRelations = serviceTypes.map(st => ({
-            vendor_id: finalVendorId,
-            service_type_id: st.id
-          }));
-          
-          const { error: insertServiceTypeError } = await supabase
-            .from('vendor_service_types')
-            .insert(serviceTypeRelations);
-          
-          if (insertServiceTypeError) {
-            console.error('Error adding service types:', insertServiceTypeError);
-            toast({
-              title: "Warning",
-              description: `Error adding service types: ${insertServiceTypeError.message}`,
-              variant: "destructive"
-            });
-          }
+          await handleServiceTypes(finalVendorId, serviceTypes);
         }
         
-        // Save tags for this new vendor
+        // Create tag relationships for new vendor
         if (tags.length > 0 && finalVendorId) {
-          const tagRelations = tags.map(tag => ({
-            vendor_id: finalVendorId,
-            tag_id: tag.id
-          }));
-          
-          const { error: insertTagError } = await supabase
-            .from('vendor_tags')
-            .insert(tagRelations);
-          
-          if (insertTagError) {
-            console.error('Error adding tags:', insertTagError);
-            toast({
-              title: "Warning",
-              description: `Error adding tags: ${insertTagError.message}`,
-              variant: "destructive"
-            });
-          }
+          await handleTags(finalVendorId, tags);
         }
         
         toast({
@@ -137,83 +105,10 @@ export const useVendorActions = (
         
         if (updateError) throw updateError;
         
-        // For existing vendors, handle service types
+        // For existing vendors, handle service types and tags
         if (finalVendorId) {
-          try {
-            // First delete existing service type relationships
-            await supabase
-              .from('vendor_service_types')
-              .delete()
-              .eq('vendor_id', finalVendorId);
-            
-            // Only insert if there are service types to add
-            if (serviceTypes.length > 0) {
-              // Then insert new service type relationships
-              const serviceTypeRelations = serviceTypes.map(st => ({
-                vendor_id: finalVendorId,
-                service_type_id: st.id
-              }));
-              
-              const { error: insertSTError } = await supabase
-                .from('vendor_service_types')
-                .insert(serviceTypeRelations);
-              
-              if (insertSTError) {
-                console.error('Error adding service types:', insertSTError);
-                toast({
-                  title: "Warning",
-                  description: `Error adding service types: ${insertSTError.message}`,
-                  variant: "destructive"
-                });
-              }
-            }
-          } catch (serviceTypeError: any) {
-            console.error('Error managing vendor service types:', serviceTypeError);
-            toast({
-              title: "Warning",
-              description: `Error managing vendor service types: ${serviceTypeError.message}`,
-              variant: "destructive"
-            });
-          }
-          
-          // Handle tags
-          try {
-            // First delete all existing tag relationships
-            await supabase
-              .from('vendor_tags')
-              .delete()
-              .eq('vendor_id', finalVendorId);
-            
-            // Then add the new tags if there are any
-            if (tags.length > 0) {
-              // Create tag relations with the vendor id
-              const tagRelations = tags.map(tag => ({
-                vendor_id: finalVendorId,
-                tag_id: tag.id
-              }));
-              
-              // Insert all tag relations
-              const { error: insertTagError } = await supabase
-                .from('vendor_tags')
-                .insert(tagRelations);
-              
-              if (insertTagError) {
-                console.error('Error adding tags:', insertTagError);
-                toast({
-                  title: "Warning",
-                  description: `Error adding tags: ${insertTagError.message}`,
-                  variant: "destructive"
-                });
-              }
-            }
-          } catch (tagError: any) {
-            console.error('Error managing vendor tags:', tagError);
-            toast({
-              title: "Warning",
-              description: `Error managing vendor tags: ${tagError.message}`,
-              variant: "destructive"
-            });
-          }
+          await handleServiceTypes(finalVendorId, serviceTypes);
+          await handleTags(finalVendorId, tags);
         }
         
         toast({
@@ -230,6 +125,94 @@ export const useVendorActions = (
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Helper function to handle service types
+  const handleServiceTypes = async (vendorId: string, serviceTypes: ServiceType[]) => {
+    try {
+      // First delete existing service type relationships
+      const { error: deleteError } = await supabase
+        .from('vendor_service_types')
+        .delete()
+        .eq('vendor_id', vendorId);
+        
+      if (deleteError) {
+        console.error('Error deleting existing service types:', deleteError);
+        toast({
+          title: "Warning",
+          description: `Error removing old service types: ${deleteError.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Then insert new service type relationships if any exist
+      if (serviceTypes.length > 0) {
+        const serviceTypeRelations = serviceTypes.map(st => ({
+          vendor_id: vendorId,
+          service_type_id: st.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('vendor_service_types')
+          .insert(serviceTypeRelations);
+        
+        if (insertError) {
+          console.error('Error adding service types:', insertError);
+          toast({
+            title: "Warning",
+            description: `Error adding service types: ${insertError.message}`,
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Error managing vendor service types:', error);
+    }
+  };
+
+  // Helper function to handle tags
+  const handleTags = async (vendorId: string, tags: Tag[]) => {
+    try {
+      // First delete all existing tag relationships
+      const { error: deleteError } = await supabase
+        .from('vendor_tags')
+        .delete()
+        .eq('vendor_id', vendorId);
+        
+      if (deleteError) {
+        console.error('Error deleting existing tags:', deleteError);
+        toast({
+          title: "Warning",
+          description: `Error removing old tags: ${deleteError.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Then insert new tag relationships if any exist
+      if (tags.length > 0) {
+        const tagRelations = tags.map(tag => ({
+          vendor_id: vendorId,
+          tag_id: tag.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('vendor_tags')
+          .insert(tagRelations);
+        
+        if (insertError) {
+          console.error('Error adding tags:', insertError);
+          toast({
+            title: "Warning",
+            description: `Error adding tags: ${insertError.message}`,
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Error managing vendor tags:', error);
     }
   };
 
