@@ -13,9 +13,10 @@ const NewBookingPage = () => {
   const [initialData, setInitialData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
-  // Extract trip ID from URL query parameters
+  // Extract trip ID and client ID from URL query parameters
   const queryParams = new URLSearchParams(location.search);
   const tripId = queryParams.get('trip');
+  const clientId = queryParams.get('clientId');
   
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -24,39 +25,50 @@ const NewBookingPage = () => {
     }
   }, [isAuthenticated, authLoading, navigate]);
   
-  // Fetch trip data if tripId is provided
+  // Fetch trip data if tripId is provided, or client data if clientId is provided
   useEffect(() => {
-    const fetchTripData = async () => {
-      if (!tripId) return;
-      
+    const fetchInitialData = async () => {
       try {
         setLoading(true);
         
-        // Fetch trip clients
-        const { data: tripClients, error: tripClientsError } = await supabase
-          .from('trip_clients')
-          .select('client_id')
-          .eq('trip_id', tripId);
-          
-        if (tripClientsError) throw tripClientsError;
+        let initialDataObj: any = {};
         
-        // Prepare initial data with clients and trip ID
-        setInitialData({
-          clients: tripClients?.map(tc => tc.client_id) || [],
-          tripId: tripId
-        });
+        // Fetch trip clients if tripId is provided
+        if (tripId) {
+          const { data: tripClients, error: tripClientsError } = await supabase
+            .from('trip_clients')
+            .select('client_id')
+            .eq('trip_id', tripId);
+            
+          if (tripClientsError) throw tripClientsError;
+          
+          initialDataObj = {
+            clients: tripClients?.map(tc => tc.client_id) || [],
+            tripId: tripId
+          };
+        } 
+        // If clientId is provided, use it to populate clients
+        else if (clientId) {
+          initialDataObj = {
+            clients: [clientId]
+          };
+        }
+        
+        setInitialData(initialDataObj);
         
       } catch (error: any) {
-        console.error('Error fetching trip data:', error);
+        console.error('Error fetching initial data:', error);
       } finally {
         setLoading(false);
       }
     };
     
-    fetchTripData();
-  }, [tripId]);
+    if (tripId || clientId) {
+      fetchInitialData();
+    }
+  }, [tripId, clientId]);
   
-  if (authLoading || (tripId && loading)) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-2">
