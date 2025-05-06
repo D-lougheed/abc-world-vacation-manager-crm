@@ -13,6 +13,8 @@ import {
   Save,
   ArrowLeft,
   Loader2,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +48,7 @@ const ClientDetailPage = () => {
   const isNewClient = id === "new";
   const [loading, setLoading] = useState(isNewClient ? false : true);
   const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(isNewClient); // Edit mode enabled by default for new clients
   const [notes, setNotes] = useState("");
   const [client, setClient] = useState<any>(null);
   const [trips, setTrips] = useState([]);
@@ -220,7 +223,8 @@ const ClientDetailPage = () => {
           description: "Client information has been updated successfully"
         });
         
-        // Refresh client data
+        // Exit edit mode and refresh client data
+        setEditMode(false);
         fetchClientData();
       }
     } catch (error: any) {
@@ -232,6 +236,21 @@ const ClientDetailPage = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (!isNewClient) {
+      // Reset form to current client values
+      form.reset({
+        firstName: client?.firstName,
+        lastName: client?.lastName,
+      });
+      setNotes(client?.notes || "");
+      setEditMode(false);
+    } else {
+      // Navigate back to clients list
+      navigate('/clients');
     }
   };
 
@@ -264,18 +283,26 @@ const ClientDetailPage = () => {
           )}
         </div>
         
-        {!isNewClient && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(`/trips/new?clientId=${id}`)}>
-              <CalendarCheck className="mr-2 h-4 w-4" />
-              New Trip
+        <div className="flex gap-2">
+          {!isNewClient && !editMode && (
+            <Button onClick={() => setEditMode(true)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Client
             </Button>
-            <Button onClick={() => navigate(`/bookings/new?clientId=${id}`)}>
-              <FilePlus2 className="mr-2 h-4 w-4" />
-              New Booking
-            </Button>
-          </div>
-        )}
+          )}
+          {!isNewClient && (
+            <>
+              <Button variant="outline" onClick={() => navigate(`/trips/new?clientId=${id}`)}>
+                <CalendarCheck className="mr-2 h-4 w-4" />
+                New Trip
+              </Button>
+              <Button onClick={() => navigate(`/bookings/new?clientId=${id}`)}>
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                New Booking
+              </Button>
+            </>
+          )}
+        </div>
       </div>
       
       <div className="grid grid-cols-3 gap-6">
@@ -284,67 +311,98 @@ const ClientDetailPage = () => {
             <CardTitle>Client Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter first name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter last name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {!isNewClient && (
-                  <>
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Client Since</Label>
-                      <div>{new Date(client?.dateCreated).toLocaleDateString()}</div>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-                      <div>{new Date(client?.lastUpdated).toLocaleDateString()}</div>
-                    </div>
-                  </>
-                )}
-                
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="min-h-[100px] mt-1"
-                    placeholder="Add client notes here..."
+            {editMode ? (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter first name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
+                  
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter last name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {!isNewClient && (
+                    <>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Client Since</Label>
+                        <div>{new Date(client?.dateCreated).toLocaleDateString()}</div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                        <div>{new Date(client?.lastUpdated).toLocaleDateString()}</div>
+                      </div>
+                    </>
+                  )}
+                  
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                    <Textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="min-h-[100px] mt-1"
+                      placeholder="Add client notes here..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button type="submit" className="flex-1" disabled={saving}>
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isNewClient ? "Create Client" : "Save Changes"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={handleCancelEdit} className="flex-1">
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">First Name</Label>
+                  <p className="mt-1">{client?.firstName}</p>
                 </div>
-                
-                <Button type="submit" className="w-full" disabled={saving}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isNewClient ? "Create Client" : "Save Changes"}
-                </Button>
-              </form>
-            </Form>
+                <div>
+                  <Label className="text-sm font-medium">Last Name</Label>
+                  <p className="mt-1">{client?.lastName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Client Since</Label>
+                  <p className="mt-1">{new Date(client?.dateCreated).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Last Updated</Label>
+                  <p className="mt-1">{new Date(client?.lastUpdated).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Notes</Label>
+                  <p className="mt-1 whitespace-pre-wrap">{client?.notes || "No notes available."}</p>
+                </div>
+              </div>
+            )}
             
-            {!isNewClient && (
+            {!isNewClient && !editMode && (
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-muted-foreground">Documents</span>
