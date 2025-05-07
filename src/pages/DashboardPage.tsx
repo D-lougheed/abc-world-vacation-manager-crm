@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarCheck, Users, Plane, CreditCard, CalendarClock } from "lucide-react";
@@ -6,7 +7,8 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { TripStatus } from "@/types";
+import { TripStatus, UserRole } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface HelpfulLink {
   id: string;
@@ -47,11 +49,20 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
-
+  const { user } = useAuth();
+  
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
+        
+        // Check if user exists
+        if (!user) {
+          return;
+        }
+        
+        // Determine if the user is an admin or agent
+        const isAdmin = user.role === UserRole.Admin || user.role === UserRole.SuperAdmin;
         
         // Fetch helpful links
         const { data: linksData, error: linksError } = await supabase
@@ -69,139 +80,281 @@ const DashboardPage = () => {
         })));
         
         // Fetch active trips (status = 'Ongoing')
-        const { data: activeTripsData, error: activeTripsError } = await supabase
+        let activeTripsQuery = supabase
           .from('trips')
           .select('*')
           .eq('status', 'Ongoing')
           .order('start_date')
           .limit(5);
         
+        // If user is an agent, only show trips they are assigned to
+        if (!isAdmin) {
+          // Get trips where the agent is assigned to any of the bookings
+          const { data: agentTripIds } = await supabase
+            .from('bookings')
+            .select('trip_id')
+            .eq('agent_id', user.id)
+            .not('trip_id', 'is', null);
+          
+          if (agentTripIds && agentTripIds.length > 0) {
+            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
+            activeTripsQuery = activeTripsQuery.in('id', tripIds);
+          } else {
+            // If agent has no trips, return empty array
+            setActiveTrips([]);
+          }
+        }
+        
+        const { data: activeTripsData, error: activeTripsError } = await activeTripsQuery;
+        
         if (activeTripsError) throw activeTripsError;
         
         // Transform active trips with client names
-        const processedActiveTrips = await Promise.all(activeTripsData.map(async (trip) => {
-          // Get clients for this trip
-          const clientNames = await getClientNamesForTrip(trip.id);
+        if (activeTripsData && activeTripsData.length > 0) {
+          const processedActiveTrips = await Promise.all(activeTripsData.map(async (trip) => {
+            // Get clients for this trip
+            const clientNames = await getClientNamesForTrip(trip.id);
+            
+            return {
+              id: trip.id,
+              name: trip.name,
+              clients: clientNames,
+              startDate: trip.start_date,
+              endDate: trip.end_date
+            };
+          }));
           
-          return {
-            id: trip.id,
-            name: trip.name,
-            clients: clientNames,
-            startDate: trip.start_date,
-            endDate: trip.end_date
-          };
-        }));
-        
-        setActiveTrips(processedActiveTrips);
+          setActiveTrips(processedActiveTrips);
+        } else {
+          setActiveTrips([]);
+        }
         
         // Fetch upcoming trips (status = 'Planned' and start_date > today)
         const today = new Date().toISOString().split('T')[0];
-        const { data: upcomingTripsData, error: upcomingTripsError } = await supabase
+        let upcomingTripsQuery = supabase
           .from('trips')
           .select('*')
           .eq('status', 'Planned')
           .gt('start_date', today)
           .order('start_date')
           .limit(5);
+          
+        // If user is an agent, only show trips they are assigned to
+        if (!isAdmin) {
+          // Get trips where the agent is assigned to any of the bookings
+          const { data: agentTripIds } = await supabase
+            .from('bookings')
+            .select('trip_id')
+            .eq('agent_id', user.id)
+            .not('trip_id', 'is', null);
+            
+          if (agentTripIds && agentTripIds.length > 0) {
+            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
+            upcomingTripsQuery = upcomingTripsQuery.in('id', tripIds);
+          } else {
+            // If agent has no trips, return empty array
+            setUpcomingTrips([]);
+          }
+        }
+        
+        const { data: upcomingTripsData, error: upcomingTripsError } = await upcomingTripsQuery;
         
         if (upcomingTripsError) throw upcomingTripsError;
         
         // Transform upcoming trips with client names
-        const processedUpcomingTrips = await Promise.all(upcomingTripsData.map(async (trip) => {
-          // Get clients for this trip
-          const clientNames = await getClientNamesForTrip(trip.id);
+        if (upcomingTripsData && upcomingTripsData.length > 0) {
+          const processedUpcomingTrips = await Promise.all(upcomingTripsData.map(async (trip) => {
+            // Get clients for this trip
+            const clientNames = await getClientNamesForTrip(trip.id);
+            
+            return {
+              id: trip.id,
+              name: trip.name,
+              clients: clientNames,
+              startDate: trip.start_date,
+              endDate: trip.end_date
+            };
+          }));
           
-          return {
-            id: trip.id,
-            name: trip.name,
-            clients: clientNames,
-            startDate: trip.start_date,
-            endDate: trip.end_date
-          };
-        }));
-        
-        setUpcomingTrips(processedUpcomingTrips);
+          setUpcomingTrips(processedUpcomingTrips);
+        } else {
+          setUpcomingTrips([]);
+        }
         
         // Fetch high priority trips
-        const { data: highPriorityTripsData, error: highPriorityTripsError } = await supabase
+        let highPriorityTripsQuery = supabase
           .from('trips')
           .select('*')
           .eq('high_priority', true)
           .order('start_date')
           .limit(5);
+          
+        // If user is an agent, only show trips they are assigned to
+        if (!isAdmin) {
+          // Get trips where the agent is assigned to any of the bookings
+          const { data: agentTripIds } = await supabase
+            .from('bookings')
+            .select('trip_id')
+            .eq('agent_id', user.id)
+            .not('trip_id', 'is', null);
+            
+          if (agentTripIds && agentTripIds.length > 0) {
+            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
+            highPriorityTripsQuery = highPriorityTripsQuery.in('id', tripIds);
+          } else {
+            // If agent has no trips, return empty array
+            setHighPriorityTrips([]);
+          }
+        }
+        
+        const { data: highPriorityTripsData, error: highPriorityTripsError } = await highPriorityTripsQuery;
         
         if (highPriorityTripsError) throw highPriorityTripsError;
         
         // Transform high priority trips with client names and status
-        const processedHighPriorityTrips = await Promise.all(highPriorityTripsData.map(async (trip) => {
-          // Get clients for this trip
-          const clientNames = await getClientNamesForTrip(trip.id);
+        if (highPriorityTripsData && highPriorityTripsData.length > 0) {
+          const processedHighPriorityTrips = await Promise.all(highPriorityTripsData.map(async (trip) => {
+            // Get clients for this trip
+            const clientNames = await getClientNamesForTrip(trip.id);
+            
+            return {
+              id: trip.id,
+              name: trip.name,
+              clients: clientNames,
+              startDate: trip.start_date,
+              status: trip.status
+            };
+          }));
           
-          return {
-            id: trip.id,
-            name: trip.name,
-            clients: clientNames,
-            startDate: trip.start_date,
-            status: trip.status
-          };
-        }));
-        
-        setHighPriorityTrips(processedHighPriorityTrips);
+          setHighPriorityTrips(processedHighPriorityTrips);
+        } else {
+          setHighPriorityTrips([]);
+        }
         
         // Fetch recent bookings
-        const { data: recentBookingsData, error: recentBookingsError } = await supabase
+        let recentBookingsQuery = supabase
           .from('bookings')
           .select('id, vendor_id, service_type_id, start_date, created_at')
           .order('created_at', { ascending: false })
           .limit(3);
+          
+        // If user is an agent, only show bookings they are assigned to
+        if (!isAdmin) {
+          recentBookingsQuery = recentBookingsQuery.eq('agent_id', user.id);
+        }
+        
+        const { data: recentBookingsData, error: recentBookingsError } = await recentBookingsQuery;
         
         if (recentBookingsError) throw recentBookingsError;
         
         // Transform recent bookings with details
-        const processedRecentBookings = await Promise.all(recentBookingsData.map(async (booking) => {
-          // Get clients for this booking
-          const clientNames = await getClientNamesForBooking(booking.id);
+        if (recentBookingsData && recentBookingsData.length > 0) {
+          const processedRecentBookings = await Promise.all(recentBookingsData.map(async (booking) => {
+            // Get clients for this booking
+            const clientNames = await getClientNamesForBooking(booking.id);
+            
+            // Get service type name
+            const { data: serviceTypeData } = await supabase
+              .from('service_types')
+              .select('name')
+              .eq('id', booking.service_type_id)
+              .single();
+            
+            // Get vendor name
+            const { data: vendorData } = await supabase
+              .from('vendors')
+              .select('name')
+              .eq('id', booking.vendor_id)
+              .single();
+            
+            return {
+              id: booking.id,
+              clients: clientNames,
+              service: serviceTypeData?.name || 'Unknown Service',
+              vendor: vendorData?.name || 'Unknown Vendor',
+              date: booking.start_date
+            };
+          }));
           
-          // Get service type name
-          const { data: serviceTypeData } = await supabase
-            .from('service_types')
-            .select('name')
-            .eq('id', booking.service_type_id)
-            .single();
-          
-          // Get vendor name
-          const { data: vendorData } = await supabase
-            .from('vendors')
-            .select('name')
-            .eq('id', booking.vendor_id)
-            .single();
-          
-          return {
-            id: booking.id,
-            clients: clientNames,
-            service: serviceTypeData?.name || 'Unknown Service',
-            vendor: vendorData?.name || 'Unknown Vendor',
-            date: booking.start_date
-          };
-        }));
+          setRecentBookings(processedRecentBookings);
+        } else {
+          setRecentBookings([]);
+        }
         
-        setRecentBookings(processedRecentBookings);
-        
-        // Fetch statistics
+        // Fetch statistics, filtered by agent for non-admin users
         // 1. Count of active trips
-        const { count: activeTripsCount, error: activeTripsCountError } = await supabase
+        let activeTripsCountQuery = supabase
           .from('trips')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'Ongoing');
         
+        if (!isAdmin) {
+          // Get trips where the agent is assigned to any of the bookings
+          const { data: agentTripIds } = await supabase
+            .from('bookings')
+            .select('trip_id')
+            .eq('agent_id', user.id)
+            .not('trip_id', 'is', null);
+            
+          if (agentTripIds && agentTripIds.length > 0) {
+            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
+            activeTripsCountQuery = activeTripsCountQuery.in('id', tripIds);
+          }
+        }
+        
+        const { count: activeTripsCount, error: activeTripsCountError } = await activeTripsCountQuery;
+        
         if (activeTripsCountError) throw activeTripsCountError;
         
-        // 2. Count of total clients
-        const { count: totalClientsCount, error: totalClientsCountError } = await supabase
-          .from('clients')
-          .select('*', { count: 'exact', head: true });
+        // 2. Count of total clients for this agent or all clients for admin
+        let totalClientsQuery;
         
-        if (totalClientsCountError) throw totalClientsCountError;
+        if (isAdmin) {
+          totalClientsQuery = supabase
+            .from('clients')
+            .select('*', { count: 'exact', head: true });
+        } else {
+          // Get unique clients from agent's bookings
+          const { data: bookingClients } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('agent_id', user.id);
+            
+          if (bookingClients && bookingClients.length > 0) {
+            const bookingIds = bookingClients.map(b => b.id);
+            
+            const { data: clientIds } = await supabase
+              .from('booking_clients')
+              .select('client_id')
+              .in('booking_id', bookingIds);
+              
+            if (clientIds && clientIds.length > 0) {
+              const uniqueClientIds = [...new Set(clientIds.map(c => c.client_id))];
+              totalClientsQuery = supabase
+                .from('clients')
+                .select('*', { count: 'exact', head: true })
+                .in('id', uniqueClientIds);
+            } else {
+              // Agent has no clients
+              setStats(prev => ({ ...prev, totalClients: 0 }));
+              totalClientsQuery = null;
+            }
+          } else {
+            // Agent has no bookings
+            setStats(prev => ({ ...prev, totalClients: 0 }));
+            totalClientsQuery = null;
+          }
+        }
+        
+        let totalClientsCount = 0;
+        
+        if (totalClientsQuery) {
+          const { count: clientCount, error: totalClientsCountError } = await totalClientsQuery;
+          
+          if (totalClientsCountError) throw totalClientsCountError;
+          
+          totalClientsCount = clientCount || 0;
+        }
         
         // 3. Count of bookings this month
         const firstDayOfMonth = new Date();
@@ -211,22 +364,36 @@ const DashboardPage = () => {
         const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
         const lastDayOfMonthStr = lastDayOfMonth.toISOString().split('T')[0];
         
-        const { count: bookingsThisMonthCount, error: bookingsThisMonthError } = await supabase
+        let bookingsThisMonthQuery = supabase
           .from('bookings')
           .select('*', { count: 'exact', head: true })
           .gte('start_date', firstDayOfMonthStr)
           .lte('start_date', lastDayOfMonthStr);
+          
+        // If user is an agent, only count their bookings
+        if (!isAdmin) {
+          bookingsThisMonthQuery = bookingsThisMonthQuery.eq('agent_id', user.id);
+        }
+        
+        const { count: bookingsThisMonthCount, error: bookingsThisMonthError } = await bookingsThisMonthQuery;
         
         if (bookingsThisMonthError) throw bookingsThisMonthError;
         
         // 4. Sum of commission this year from confirmed bookings
         const firstDayOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
         
-        const { data: commissionData, error: commissionError } = await supabase
+        let commissionQuery = supabase
           .from('bookings')
           .select('commission_amount')
           .eq('booking_status', 'Confirmed')
           .gte('start_date', firstDayOfYear);
+          
+        // If user is an agent, only count their commissions
+        if (!isAdmin) {
+          commissionQuery = commissionQuery.eq('agent_id', user.id);
+        }
+        
+        const { data: commissionData, error: commissionError } = await commissionQuery;
         
         if (commissionError) throw commissionError;
         
@@ -235,7 +402,7 @@ const DashboardPage = () => {
         // Set all statistics
         setStats({
           activeTrips: activeTripsCount || 0,
-          totalClients: totalClientsCount || 0,
+          totalClients: totalClientsCount,
           bookingsThisMonth: bookingsThisMonthCount || 0,
           commissionYtd: commissionYtd
         });
@@ -253,7 +420,7 @@ const DashboardPage = () => {
     };
 
     fetchDashboardData();
-  }, [toast]);
+  }, [toast, user]);
 
   // Helper function to get client names for a trip
   const getClientNamesForTrip = async (tripId: string): Promise<string> => {
