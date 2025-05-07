@@ -252,11 +252,18 @@ const AgentsPage = () => {
   const canManageAgent = (agentRole: string): boolean => {
     if (!user) return false;
     
-    // Convert string role to UserRole enum
-    const targetAgentRole = getEnumRole(agentRole || "Agent");
+    // SuperAdmin can edit anyone
+    if (user.role === UserRole.SuperAdmin) {
+      return true;
+    }
     
-    // Only allow editing if current user role is higher (lower number) than the agent's role
-    return user.role < targetAgentRole;
+    // Admin can edit only Agents
+    if (user.role === UserRole.Admin) {
+      return agentRole === "Agent";
+    }
+    
+    // Agents cannot edit anyone
+    return false;
   };
 
   return (
