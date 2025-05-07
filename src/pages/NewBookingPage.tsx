@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import BookingForm from "@/components/forms/BookingForm";
 import { Loader2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { UserRole } from "@/types";
+import { UserRole, BookingStatus, CommissionStatus } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -64,6 +64,7 @@ const NewBookingPage = () => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
+        console.log("Fetching initial data for booking form");
         
         let initialDataObj: any = {};
         
@@ -108,8 +109,8 @@ const NewBookingPage = () => {
         }
         
         // Initialize booking and commission status with defaults
-        initialDataObj.bookingStatus = 'Pending';
-        initialDataObj.commissionStatus = 'Unreceived';
+        initialDataObj.bookingStatus = BookingStatus.Pending;
+        initialDataObj.commissionStatus = CommissionStatus.Unreceived;
         
         console.log("Initial data for booking form:", initialDataObj);
         setInitialData(initialDataObj);

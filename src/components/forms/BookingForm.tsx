@@ -163,6 +163,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [selectedVendorCommissionRate, setSelectedVendorCommissionRate] = useState<number | null>(null);
   const timeOptions = generateTimeOptions();
 
+  // Add debug state to help troubleshoot form submission
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  
   // Default values for the form
   const defaultValues: Partial<BookingFormValues> = {
     clients: initialData?.clients || [],
@@ -188,6 +191,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
     defaultValues: initialData || defaultValues,
+    mode: "onSubmit", // Ensure validation runs on submit
   });
   
   const watchCost = form.watch("cost");
@@ -450,9 +454,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   // Handle form submission
   const onSubmit = async (values: BookingFormValues) => {
     try {
+      console.log("Form submission started", values);
+      setFormSubmitting(true);
       setLoading(true);
-      console.log("Form submitted with values:", values); // Log form values for debugging
-
+      
       // Calculate commission amount based on cost and rate
       const commissionAmount = (values.cost * values.commissionRate) / 100;
       
@@ -577,8 +582,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             cost: values.cost,
             commission_rate: values.commissionRate,
             commission_amount: commissionAmount,
-            booking_status: values.bookingStatus || 'Pending', // Ensure default value
-            commission_status: values.commissionStatus || 'Unreceived', // Ensure default value
+            booking_status: values.bookingStatus || 'Pending', 
+            commission_status: values.commissionStatus || 'Unreceived',
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
@@ -654,8 +659,18 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         variant: "destructive"
       });
     } finally {
+      setFormSubmitting(false);
       setLoading(false);
     }
+  };
+
+  const onError = (errors: any) => {
+    console.error("Form validation errors:", errors);
+    toast({
+      title: "Validation Error",
+      description: "Please check the form for errors and try again.",
+      variant: "destructive"
+    });
   };
 
   // Handle cancellation
@@ -684,9 +699,17 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     }
   };
 
+  useEffect(() => {
+    // Log form values whenever they change significantly
+    const subscription = form.watch((value) => {
+      console.log("Form values updated:", value);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="col-span-1 lg:col-span-2">
             <CardHeader>
@@ -1223,8 +1246,17 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
               />
               
               <div className="pt-4 flex flex-col space-y-2">
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Processing..." : bookingId ? "Update Booking" : "Create Booking"}
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loading || formSubmitting}
+                  onClick={() => {
+                    console.log("Submit button clicked");
+                    console.log("Form valid?", form.formState.isValid);
+                    console.log("Form errors:", form.formState.errors);
+                  }}
+                >
+                  {loading || formSubmitting ? "Processing..." : bookingId ? "Update Booking" : "Create Booking"}
                 </Button>
                 <Button variant="outline" type="button" className="w-full" onClick={onCancel}>
                   Cancel
