@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -61,14 +62,17 @@ const AddAgentForm = () => {
   const onSubmit = async (values: FormValues) => {
     try {
       setIsSubmitting(true);
+      console.log("Submitting form values:", values);
 
       // Get the current session for authorization
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("You must be logged in to create an agent");
       }
+      
+      console.log("Got session, access token available");
 
-      // Call our edge function to create the agent
+      // Call our edge function to create the agent - using the full URL
       const response = await fetch('https://gvslnylvljmhvlkixmmu.supabase.co/functions/v1/create-agent', {
         method: 'POST',
         headers: {
@@ -84,7 +88,9 @@ const AddAgentForm = () => {
         })
       });
       
+      console.log("Response status:", response.status);
       const data = await response.json();
+      console.log("Response data:", data);
       
       if (!response.ok) {
         throw new Error(data.error || "Failed to create agent");
