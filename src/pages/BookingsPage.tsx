@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   FilePlus2,
-  Filter,
-  CreditCard,
   Users,
   Briefcase,
   Calendar,
@@ -35,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookingStatus, CommissionStatus } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import BookingFilters, { BookingFilters } from "@/components/bookings/BookingFilters";
 
 interface BookingWithDetails {
   id: string;
@@ -57,9 +56,42 @@ interface BookingWithDetails {
 const BookingsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string }[]>([]);
+  const [filters, setFilters] = useState<BookingFilters>({
+    clientSearchTerm: "",
+    serviceTypes: [],
+    dateRange: { from: undefined, to: undefined },
+    bookingStatuses: [],
+    commissionStatuses: []
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch service types for filter dropdown
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('service_types')
+          .select('id, name')
+          .order('name');
+        
+        if (error) throw error;
+        setServiceTypes(data || []);
+      } catch (error: any) {
+        console.error('Error fetching service types:', error);
+        toast({
+          title: "Failed to load service types",
+          description: error.message || "There was an error loading service types",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchServiceTypes();
+  }, [toast]);
 
   // Fetch bookings from Supabase
   useEffect(() => {
@@ -169,6 +201,7 @@ const BookingsPage = () => {
         }));
         
         setBookings(bookingsWithDetails);
+        setFilteredBookings(bookingsWithDetails);
       } catch (error: any) {
         console.error('Error fetching bookings:', error);
         toast({
@@ -184,24 +217,88 @@ const BookingsPage = () => {
     fetchBookings();
   }, [toast]);
 
-  // Filter bookings based on search term
-  const filteredBookings = bookings.filter((booking) => {
-    const clientNames = booking.clients.join(" ").toLowerCase();
-    const vendor = booking.vendor.toLowerCase();
-    const trip = booking.trip?.toLowerCase() || "";
-    const serviceType = booking.serviceType.toLowerCase();
-    const location = booking.location.toLowerCase();
+  // Search and filter bookings based on search term and filters
+  useEffect(() => {
+    const applyFiltersAndSearch = () => {
+      let result = [...bookings];
+      
+      // Apply search term
+      if (searchTerm.trim()) {
+        const searchString = searchTerm.toLowerCase();
+        result = result.filter((booking) => {
+          const clientNames = booking.clients.join(" ").toLowerCase();
+          const vendor = booking.vendor.toLowerCase();
+          const trip = booking.trip?.toLowerCase() || "";
+          const serviceType = booking.serviceType.toLowerCase();
+          const location = booking.location.toLowerCase();
+          
+          return (
+            clientNames.includes(searchString) ||
+            vendor.includes(searchString) ||
+            trip.includes(searchString) ||
+            serviceType.includes(searchString) ||
+            location.includes(searchString)
+          );
+        });
+      }
+      
+      // Apply client search filter
+      if (filters.clientSearchTerm.trim()) {
+        const clientSearch = filters.clientSearchTerm.toLowerCase();
+        result = result.filter(booking => {
+          const clientNames = booking.clients.join(" ").toLowerCase();
+          return clientNames.includes(clientSearch);
+        });
+      }
+      
+      // Apply service type filter
+      if (filters.serviceTypes.length > 0) {
+        result = result.filter(booking => 
+          filters.serviceTypes.includes(booking.serviceType)
+        );
+      }
+      
+      // Apply date range filter
+      if (filters.dateRange.from || filters.dateRange.to) {
+        result = result.filter(booking => {
+          const bookingDate = new Date(booking.startDate);
+          
+          if (filters.dateRange.from && filters.dateRange.to) {
+            return bookingDate >= filters.dateRange.from && 
+                   bookingDate <= filters.dateRange.to;
+          }
+          
+          if (filters.dateRange.from) {
+            return bookingDate >= filters.dateRange.from;
+          }
+          
+          if (filters.dateRange.to) {
+            return bookingDate <= filters.dateRange.to;
+          }
+          
+          return true;
+        });
+      }
+      
+      // Apply booking status filter
+      if (filters.bookingStatuses.length > 0) {
+        result = result.filter(booking => 
+          filters.bookingStatuses.includes(booking.bookingStatus)
+        );
+      }
+      
+      // Apply commission status filter
+      if (filters.commissionStatuses.length > 0) {
+        result = result.filter(booking => 
+          filters.commissionStatuses.includes(booking.commissionStatus)
+        );
+      }
+      
+      setFilteredBookings(result);
+    };
     
-    const searchString = searchTerm.toLowerCase();
-    
-    return (
-      clientNames.includes(searchString) ||
-      vendor.includes(searchString) ||
-      trip.includes(searchString) ||
-      serviceType.includes(searchString) ||
-      location.includes(searchString)
-    );
-  });
+    applyFiltersAndSearch();
+  }, [bookings, searchTerm, filters]);
 
   // Function to get booking status badge styling
   const getBookingStatusBadgeStyle = (status: BookingStatus) => {
@@ -233,6 +330,11 @@ const BookingsPage = () => {
     }
   };
 
+  // Handle filter changes
+  const handleFilterChange = (newFilters: BookingFilters) => {
+    setFilters(newFilters);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -259,10 +361,10 @@ const BookingsPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="w-full md:w-auto">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
+            <BookingFilters 
+              onFilterChange={handleFilterChange} 
+              serviceTypes={serviceTypes}
+            />
           </div>
 
           <div className="rounded-md border overflow-x-auto">
@@ -330,7 +432,6 @@ const BookingsPage = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <CreditCard className="h-4 w-4 text-primary" />
                           <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
