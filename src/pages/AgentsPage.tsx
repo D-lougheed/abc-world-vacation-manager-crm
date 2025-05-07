@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -362,8 +361,9 @@ const AgentsPage = () => {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                disabled={!canManage} 
-                                onClick={() => handleEditAgent(agent)}
+                                disabled={!canManage}
+                                onClick={() => canManage && handleEditAgent(agent)}
+                                title={canManage ? "Edit agent" : "Cannot edit users with equal or higher role"}
                               >
                                 <UserCog className="h-4 w-4" />
                               </Button>
