@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -43,6 +42,16 @@ import {
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
@@ -72,7 +81,9 @@ const TagsPage = () => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [mergeLoading, setMergeLoading] = useState(false);
+  const [removeUnusedLoading, setRemoveUnusedLoading] = useState(false);
   const [openTagDialog, setOpenTagDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   
@@ -298,6 +309,84 @@ const TagsPage = () => {
     }
   };
 
+  // Handle removing unused tags
+  const handleRemoveUnusedTags = async () => {
+    try {
+      // Find unused tags (tags with usageCount === 0)
+      const unusedTags = tags.filter(tag => tag.usageCount === 0);
+      
+      // If there are no unused tags, show a message and return
+      if (unusedTags.length === 0) {
+        toast({
+          title: "No unused tags found",
+          description: "There are no unused tags to remove.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      // Otherwise, open the confirmation dialog
+      setOpenDeleteDialog(true);
+    } catch (error: any) {
+      console.error('Error checking unused tags:', error);
+      toast({
+        title: "Failed to check unused tags",
+        description: error.message || "There was an error checking for unused tags",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Execute the removal of unused tags
+  const executeRemoveUnusedTags = async () => {
+    try {
+      setRemoveUnusedLoading(true);
+      
+      // Get unused tags
+      const unusedTags = tags.filter(tag => tag.usageCount === 0);
+      
+      if (unusedTags.length === 0) {
+        toast({
+          title: "No unused tags found",
+          description: "There are no unused tags to remove.",
+          variant: "default"
+        });
+        setOpenDeleteDialog(false);
+        return;
+      }
+      
+      // Delete each unused tag
+      const unusedTagIds = unusedTags.map(tag => tag.id);
+      
+      const { error } = await supabase
+        .from('tags')
+        .delete()
+        .in('id', unusedTagIds);
+      
+      if (error) throw error;
+      
+      // Refresh tags list
+      await fetchTags();
+      
+      toast({
+        title: "Unused tags removed",
+        description: `${unusedTags.length} unused tags have been removed.`,
+        variant: "default"
+      });
+      
+    } catch (error: any) {
+      console.error('Error removing unused tags:', error);
+      toast({
+        title: "Failed to remove unused tags",
+        description: error.message || "There was an error removing the unused tags",
+        variant: "destructive"
+      });
+    } finally {
+      setRemoveUnusedLoading(false);
+      setOpenDeleteDialog(false);
+    }
+  };
+
   // Filter tags based on search term
   const filteredTags = tags.filter((tag) => {
     return tag.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -312,6 +401,9 @@ const TagsPage = () => {
 
   // Calculate total usage
   const totalUsage = tags.reduce((sum, tag) => sum + tag.usageCount, 0);
+
+  // Count unused tags
+  const unusedTagsCount = tags.filter(tag => tag.usageCount === 0).length;
 
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
@@ -449,10 +541,25 @@ const TagsPage = () => {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <Button variant="outline">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove Unused Tags
-                </Button>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleRemoveUnusedTags}
+                        disabled={removeUnusedLoading || unusedTagsCount === 0}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {removeUnusedLoading ? 'Removing...' : 'Remove Unused Tags'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Removes tags that aren't used anywhere ({unusedTagsCount} unused)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
                 <Button variant="outline">
                   <Edit className="mr-2 h-4 w-4" />
                   Batch Edit Tags
@@ -517,6 +624,31 @@ const TagsPage = () => {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Unused Tags Confirmation Dialog */}
+      <AlertDialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Unused Tags</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all tags that aren't used anywhere in the system. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeUnusedLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                executeRemoveUnusedTags();
+              }}
+              disabled={removeUnusedLoading}
+            >
+              {removeUnusedLoading ? "Removing..." : "Remove Unused Tags"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleBasedComponent>
   );
 };
