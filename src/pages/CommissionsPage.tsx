@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -531,7 +530,7 @@ const CommissionsPage = () => {
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80 md:w-96 p-4" align="end">
+                  <PopoverContent className="w-80 md:w-96 p-4" align="start" side="bottom">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold">Filters</h3>
