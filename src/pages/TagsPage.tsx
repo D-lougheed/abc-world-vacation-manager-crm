@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -7,6 +6,7 @@ import {
   Trash2,
   Edit,
   Plus,
+  Merge
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,65 +47,168 @@ const TagsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mergeLoading, setMergeLoading] = useState(false);
   const { toast } = useToast();
 
   // Fetch tags from Supabase
-  useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        setLoading(true);
+  const fetchTags = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch tags
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('tags')
+        .select('*')
+        .order('name');
+      
+      if (tagsError) throw tagsError;
+      
+      // For each tag, count its usage
+      const tagsWithUsage = await Promise.all(tagsData.map(async (tag) => {
+        // Count service_type_tags usage
+        const { count: serviceTypeTagsCount, error: serviceTypeTagsError } = await supabase
+          .from('service_type_tags')
+          .select('tag_id', { count: 'exact', head: true })
+          .eq('tag_id', tag.id);
         
-        // Fetch tags
-        const { data: tagsData, error: tagsError } = await supabase
-          .from('tags')
-          .select('*')
-          .order('name');
+        if (serviceTypeTagsError) throw serviceTypeTagsError;
         
-        if (tagsError) throw tagsError;
+        // Count vendor_tags usage
+        const { count: vendorTagsCount, error: vendorTagsError } = await supabase
+          .from('vendor_tags')
+          .select('tag_id', { count: 'exact', head: true })
+          .eq('tag_id', tag.id);
         
-        // For each tag, count its usage
-        const tagsWithUsage = await Promise.all(tagsData.map(async (tag) => {
-          // Count service_type_tags usage
-          const { count: serviceTypeTagsCount, error: serviceTypeTagsError } = await supabase
-            .from('service_type_tags')
-            .select('tag_id', { count: 'exact', head: true })
-            .eq('tag_id', tag.id);
-          
-          if (serviceTypeTagsError) throw serviceTypeTagsError;
-          
-          // Count vendor_tags usage
-          const { count: vendorTagsCount, error: vendorTagsError } = await supabase
-            .from('vendor_tags')
-            .select('tag_id', { count: 'exact', head: true })
-            .eq('tag_id', tag.id);
-          
-          if (vendorTagsError) throw vendorTagsError;
-          
-          // Total usage count
-          const usageCount = (serviceTypeTagsCount || 0) + (vendorTagsCount || 0);
-          
-          return {
-            id: tag.id,
-            name: tag.name,
-            usageCount: usageCount
-          };
-        }));
+        if (vendorTagsError) throw vendorTagsError;
         
-        setTags(tagsWithUsage);
-      } catch (error: any) {
-        console.error('Error fetching tags:', error);
-        toast({
-          title: "Failed to load tags",
-          description: error.message || "There was an error loading the tag data",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+        // Total usage count
+        const usageCount = (serviceTypeTagsCount || 0) + (vendorTagsCount || 0);
+        
+        return {
+          id: tag.id,
+          name: tag.name,
+          usageCount: usageCount
+        };
+      }));
+      
+      setTags(tagsWithUsage);
+    } catch (error: any) {
+      console.error('Error fetching tags:', error);
+      toast({
+        title: "Failed to load tags",
+        description: error.message || "There was an error loading the tag data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchTags();
   }, [toast]);
+
+  // Merge similar tags (tags with the same name)
+  const handleMergeSimilarTags = async () => {
+    try {
+      setMergeLoading(true);
+      
+      // Find tags with the same names
+      const tagNames = tags.map(tag => tag.name.toLowerCase().trim());
+      const uniqueTagNames = [...new Set(tagNames)];
+      
+      // If there are no duplicate names, show a message and return
+      if (tagNames.length === uniqueTagNames.length) {
+        toast({
+          title: "No similar tags found",
+          description: "There are no tags with the same name to merge.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      // Process each unique name
+      let mergedCount = 0;
+      for (const name of uniqueTagNames) {
+        // Find all tags with this name
+        const sameTags = tags.filter(tag => tag.name.toLowerCase().trim() === name)
+          .sort((a, b) => a.id.localeCompare(b.id)); // Sort by ID to keep the oldest
+        
+        // If there's only one tag with this name, continue to the next name
+        if (sameTags.length <= 1) continue;
+        
+        // Keep the oldest tag (first in sorted array) and merge the rest into it
+        const oldestTag = sameTags[0];
+        const tagsToMerge = sameTags.slice(1);
+        
+        console.log(`Merging ${tagsToMerge.length} tags into ${oldestTag.name} (ID: ${oldestTag.id})`);
+        
+        // For each tag to merge, update all references and then delete the tag
+        for (const tagToMerge of tagsToMerge) {
+          // Update service_type_tags references
+          const { error: stError } = await supabase
+            .from('service_type_tags')
+            .update({ tag_id: oldestTag.id })
+            .eq('tag_id', tagToMerge.id);
+          
+          if (stError) throw stError;
+          
+          // Update vendor_tags references
+          const { error: vtError } = await supabase
+            .from('vendor_tags')
+            .update({ tag_id: oldestTag.id })
+            .eq('tag_id', tagToMerge.id);
+          
+          if (vtError) throw vtError;
+          
+          // Update booking_tags references
+          const { error: btError } = await supabase
+            .from('booking_tags')
+            .update({ tag_id: oldestTag.id })
+            .eq('tag_id', tagToMerge.id);
+          
+          if (btError) throw btError;
+          
+          // Update trip_tags references
+          const { error: ttError } = await supabase
+            .from('trip_tags')
+            .update({ tag_id: oldestTag.id })
+            .eq('tag_id', tagToMerge.id);
+          
+          if (ttError) throw ttError;
+          
+          // Delete the merged tag
+          const { error: deleteError } = await supabase
+            .from('tags')
+            .delete()
+            .eq('id', tagToMerge.id);
+          
+          if (deleteError) throw deleteError;
+          
+          mergedCount++;
+        }
+      }
+      
+      // Refresh tags after merging
+      await fetchTags();
+      
+      toast({
+        title: "Tags merged successfully",
+        description: `${mergedCount} duplicate tags have been merged.`,
+        variant: "default"
+      });
+      
+    } catch (error: any) {
+      console.error('Error merging tags:', error);
+      toast({
+        title: "Failed to merge tags",
+        description: error.message || "There was an error merging the tags",
+        variant: "destructive"
+      });
+    } finally {
+      setMergeLoading(false);
+    }
+  };
 
   // Filter tags based on search term
   const filteredTags = tags.filter((tag) => {
@@ -235,10 +344,23 @@ const TagsPage = () => {
             <div className="mt-6">
               <h3 className="text-lg font-medium mb-2">Tag Management Tools</h3>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Merge Similar Tags
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleMergeSimilarTags}
+                        disabled={mergeLoading}
+                      >
+                        <Merge className="mr-2 h-4 w-4" />
+                        {mergeLoading ? 'Merging...' : 'Merge Similar Tags'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Merges Tags that have the same name</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button variant="outline">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Remove Unused Tags
