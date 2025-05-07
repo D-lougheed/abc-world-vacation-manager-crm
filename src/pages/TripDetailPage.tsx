@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,22 +15,28 @@ import {
   Loader2,
   MapPin,
   Save,
-  Plus
+  Plus,
+  UserCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { TripStatus } from "@/types";
+import { TripStatus, UserRole } from "@/types";
 import { MultiSelect } from "@/components/forms/MultiSelect";
+import { useAuth } from "@/contexts/AuthContext";
+import RoleBasedComponent from "@/components/RoleBasedComponent";
 
 const TripDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clientsLoading, setClientsLoading] = useState(false);
+  const [agentsLoading, setAgentsLoading] = useState(false);
   const [trip, setTrip] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [availableClients, setAvailableClients] = useState<any[]>([]);
+  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
+  const [agentName, setAgentName] = useState<string>("");
   const [bookings, setBookings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("details");
   const [isNewTrip, setIsNewTrip] = useState(false);
@@ -41,10 +48,12 @@ const TripDetailPage = () => {
     highPriority: false,
     description: "",
     notes: "",
-    clients: [] as string[]
+    clients: [] as string[],
+    agentId: "" as string
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch all available clients
   useEffect(() => {
@@ -77,13 +86,53 @@ const TripDetailPage = () => {
     fetchAllClients();
   }, [toast]);
 
+  // Fetch all available agents (only for admins)
+  useEffect(() => {
+    const fetchAllAgents = async () => {
+      // Only fetch agents if user is admin or super admin
+      if (!user || (user.role !== UserRole.Admin && user.role !== UserRole.SuperAdmin)) {
+        return;
+      }
+      
+      try {
+        setAgentsLoading(true);
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("role", [UserRole.Agent, UserRole.Admin, UserRole.SuperAdmin])
+          .eq("is_active", true)
+          .order("first_name");
+
+        if (error) throw error;
+        
+        setAvailableAgents(data.map(agent => ({
+          value: agent.id,
+          label: `${agent.first_name} ${agent.last_name}`
+        })));
+      } catch (error: any) {
+        console.error("Error fetching agents:", error);
+        toast({
+          title: "Error",
+          description: `Failed to load agents: ${error.message}`,
+          variant: "destructive"
+        });
+      } finally {
+        setAgentsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchAllAgents();
+    }
+  }, [user, toast]);
+
   useEffect(() => {
     // Check if this is a new trip
     if (id === "new") {
       setIsNewTrip(true);
       setLoading(false);
       
-      // Set empty form data for new trip (no prepopulated values)
+      // Set empty form data for new trip with current user as agent
       setFormData({
         name: "",
         startDate: "",
@@ -92,14 +141,15 @@ const TripDetailPage = () => {
         highPriority: false,
         description: "",
         notes: "",
-        clients: []
+        clients: [],
+        agentId: user?.id || ""
       });
       
       return;
     }
     
     fetchTripData();
-  }, [id]);
+  }, [id, user]);
 
   const fetchTripData = async () => {
     try {
@@ -121,6 +171,19 @@ const TripDetailPage = () => {
       }
       
       setTrip(tripData);
+      
+      // Fetch agent name if agent_id exists
+      if (tripData.agent_id) {
+        const { data: agentData, error: agentError } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", tripData.agent_id)
+          .single();
+          
+        if (!agentError && agentData) {
+          setAgentName(`${agentData.first_name} ${agentData.last_name}`);
+        }
+      }
       
       // Fetch client data
       const { data: tripClientData, error: tripClientError } = await supabase
@@ -155,7 +218,8 @@ const TripDetailPage = () => {
         highPriority: tripData.high_priority,
         description: tripData.description || "",
         notes: tripData.notes || "",
-        clients: clientIds
+        clients: clientIds,
+        agentId: tripData.agent_id || ""
       });
       
       // Fetch bookings associated with this trip
@@ -209,6 +273,13 @@ const TripDetailPage = () => {
     });
   };
 
+  const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFormData({
+      ...formData,
+      agentId: e.target.value
+    });
+  };
+
   const handleSaveTrip = async () => {
     try {
       setSaving(true);
@@ -220,7 +291,8 @@ const TripDetailPage = () => {
         status: formData.status as TripStatus,
         high_priority: formData.highPriority,
         description: formData.description,
-        notes: formData.notes
+        notes: formData.notes,
+        agent_id: formData.agentId || user?.id
       };
       
       let tripId = id;
@@ -424,6 +496,15 @@ const TripDetailPage = () => {
                     <span className="text-sm font-medium">High Priority</span>
                   </label>
                 </div>
+
+                {/* Agent field (read-only for non-admin users) */}
+                <div className="space-y-2">
+                  <label htmlFor="agentId" className="text-sm font-medium">Assigned Agent</label>
+                  <div className="flex items-center p-2 bg-gray-50 border rounded-md">
+                    <UserCircle className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span>{user?.firstName} {user?.lastName} (You)</span>
+                  </div>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -559,6 +640,13 @@ const TripDetailPage = () => {
                         <span className="font-medium">High Priority Trip</span>
                       </div>
                     )}
+                    <div className="flex items-center gap-2">
+                      <UserCircle className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        <span className="font-medium">Agent: </span>
+                        {agentName || "Unassigned"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
@@ -734,6 +822,32 @@ const TripDetailPage = () => {
                       />
                       <span className="text-sm font-medium">High Priority</span>
                     </label>
+                  </div>
+                  
+                  {/* Agent field (editable only for admin users) */}
+                  <div className="space-y-2">
+                    <label htmlFor="agentId" className="text-sm font-medium">Assigned Agent</label>
+                    <RoleBasedComponent requiredRole={UserRole.Admin} fallback={
+                      <div className="flex items-center p-2 bg-gray-50 border rounded-md">
+                        <UserCircle className="h-4 w-4 text-muted-foreground mr-2" />
+                        <span>{agentName || "Unassigned"}</span>
+                      </div>
+                    }>
+                      <select
+                        id="agentId"
+                        name="agentId"
+                        className="w-full p-2 border rounded-md"
+                        value={formData.agentId}
+                        onChange={handleAgentChange}
+                      >
+                        <option value="">Select an agent</option>
+                        {availableAgents.map((agent) => (
+                          <option key={agent.value} value={agent.value}>
+                            {agent.label}
+                          </option>
+                        ))}
+                      </select>
+                    </RoleBasedComponent>
                   </div>
                 </div>
 

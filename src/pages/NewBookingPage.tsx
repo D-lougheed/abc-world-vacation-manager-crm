@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const NewBookingPage = () => {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [initialData, setInitialData] = useState<any>(null);
@@ -33,8 +33,17 @@ const NewBookingPage = () => {
         
         let initialDataObj: any = {};
         
-        // Fetch trip clients if tripId is provided
+        // Fetch trip data if tripId is provided
         if (tripId) {
+          // Get trip details including agent_id
+          const { data: tripData, error: tripError } = await supabase
+            .from('trips')
+            .select('agent_id')
+            .eq('id', tripId)
+            .single();
+            
+          if (tripError) throw tripError;
+          
           const { data: tripClients, error: tripClientsError } = await supabase
             .from('trip_clients')
             .select('client_id')
@@ -44,14 +53,22 @@ const NewBookingPage = () => {
           
           initialDataObj = {
             clients: tripClients?.map(tc => tc.client_id) || [],
-            tripId: tripId
+            tripId: tripId,
+            agentId: tripData?.agent_id || user?.id
           };
         } 
         // If clientId is provided, use it to populate clients
         else if (clientId) {
           initialDataObj = {
             clients: [clientId],
-            tripId: null // Set to null instead of undefined
+            tripId: null,
+            agentId: user?.id
+          };
+        } else {
+          // No parameters provided
+          initialDataObj = {
+            tripId: null,
+            agentId: user?.id
           };
         }
         
@@ -64,13 +81,10 @@ const NewBookingPage = () => {
       }
     };
     
-    if (tripId || clientId) {
+    if (user) {
       fetchInitialData();
-    } else {
-      // Set initialData with null tripId when no parameters are provided
-      setInitialData({ tripId: null });
     }
-  }, [tripId, clientId]);
+  }, [tripId, clientId, user]);
   
   if (authLoading || loading) {
     return (

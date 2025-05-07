@@ -8,7 +8,8 @@ import {
   Users,
   CalendarRange,
   AlertTriangle,
-  Loader2
+  Loader2,
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ interface TripWithDetails {
   endDate: string;
   isHighPriority: boolean;
   bookingsCount: number;
+  agentName?: string;
 }
 
 const TripsPage = () => {
@@ -77,7 +79,7 @@ const TripsPage = () => {
         
         if (tripsError) throw tripsError;
         
-        // For each trip, fetch associated clients and booking count
+        // For each trip, fetch associated clients, agent and booking count
         const tripsWithDetails = await Promise.all((tripsData || []).map(async (trip) => {
           // Fetch clients for this trip
           const { data: tripClients, error: tripClientsError } = await supabase
@@ -99,6 +101,20 @@ const TripsPage = () => {
             clientNames = clientsData ? clientsData.map(client => `${client.first_name} ${client.last_name}`) : [];
           }
           
+          // Fetch agent name if agent_id exists
+          let agentName: string | undefined;
+          if (trip.agent_id) {
+            const { data: agentData, error: agentError } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', trip.agent_id)
+              .single();
+              
+            if (!agentError && agentData) {
+              agentName = `${agentData.first_name} ${agentData.last_name}`;
+            }
+          }
+          
           // Count bookings for this trip
           const { count: bookingsCount, error: bookingsCountError } = await supabase
             .from('bookings')
@@ -115,7 +131,8 @@ const TripsPage = () => {
             startDate: trip.start_date,
             endDate: trip.end_date,
             isHighPriority: trip.high_priority,
-            bookingsCount: bookingsCount || 0
+            bookingsCount: bookingsCount || 0,
+            agentName
           };
         }));
         
@@ -139,7 +156,12 @@ const TripsPage = () => {
   const filteredTrips = trips.filter((trip) => {
     const tripName = trip.name.toLowerCase();
     const clients = trip.clients.join(" ").toLowerCase();
-    return tripName.includes(searchTerm.toLowerCase()) || clients.includes(searchTerm.toLowerCase());
+    const agent = trip.agentName?.toLowerCase() || "";
+    return (
+      tripName.includes(searchTerm.toLowerCase()) || 
+      clients.includes(searchTerm.toLowerCase()) ||
+      agent.includes(searchTerm.toLowerCase())
+    );
   });
 
   // Function to get status badge styling
@@ -194,13 +216,14 @@ const TripsPage = () => {
                   <TableHead>Clients</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Dates</TableHead>
+                  <TableHead>Agent</TableHead>
                   <TableHead>Bookings</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       <div className="flex justify-center items-center">
                         <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                         <span>Loading trips...</span>
@@ -241,12 +264,18 @@ const TripsPage = () => {
                           </span>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <UserCircle className="h-4 w-4 text-muted-foreground mr-2" />
+                          <span>{trip.agentName || "Unassigned"}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>{trip.bookingsCount}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No trips found. Try a different search term or create a new trip.
                     </TableCell>
                   </TableRow>
