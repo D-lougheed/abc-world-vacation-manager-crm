@@ -48,7 +48,7 @@ const EditBookingPage = () => {
         const formattedData = {
           ...data,
           clients: data.booking_clients.map((bc: any) => bc.client_id),
-          vendor: data.vendor_id, // Use vendor_id directly as a string
+          vendor: data.vendor_id,
           serviceType: data.service_type_id,
           startDate: new Date(data.start_date),
           startTime: data.start_time ? convertTo12HourFormat(data.start_time) : "",
@@ -58,7 +58,7 @@ const EditBookingPage = () => {
           bookingStatus: data.booking_status,
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
-          tripId: data.trip_id || null // Use null instead of "no_trip" to avoid UUID conversion issues
+          tripId: data.trip_id // Preserve as null if it's null
         };
         
         setBookingData(formattedData);

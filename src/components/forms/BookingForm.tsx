@@ -78,11 +78,11 @@ const bookingSchema = z.object({
   location: z.string().min(1, { message: "Location is required" }),
   cost: z.number().positive({ message: "Cost must be a positive number" }),
   commissionRate: z.number().min(0, { message: "Commission rate cannot be negative" }),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
   bookingStatus: z.enum(["Pending", "Confirmed", "Canceled"]),
   commissionStatus: z.enum(["Unreceived", "Received", "Canceled", "Completed"]),
   isCompleted: z.boolean().default(false),
-  tripId: z.string().optional(),
+  tripId: z.string().nullable().optional(),
   rating: z.number().min(0).max(5).optional(),
 });
 
