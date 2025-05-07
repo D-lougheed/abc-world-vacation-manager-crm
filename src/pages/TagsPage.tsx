@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -6,7 +7,9 @@ import {
   Trash2,
   Edit,
   Plus,
-  Merge
+  Merge,
+  Check,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,10 +35,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 interface Tag {
   id: string;
@@ -43,12 +58,31 @@ interface Tag {
   usageCount: number;
 }
 
+// Form schema for tag creation
+const tagFormSchema = z.object({
+  name: z.string()
+    .min(1, "Tag name is required")
+    .max(50, "Tag name cannot be more than 50 characters")
+});
+
+type TagFormValues = z.infer<typeof tagFormSchema>;
+
 const TagsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [mergeLoading, setMergeLoading] = useState(false);
+  const [openTagDialog, setOpenTagDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  // Initialize form
+  const form = useForm<TagFormValues>({
+    resolver: zodResolver(tagFormSchema),
+    defaultValues: {
+      name: "",
+    },
+  });
 
   // Fetch tags from Supabase
   const fetchTags = async () => {
@@ -210,6 +244,60 @@ const TagsPage = () => {
     }
   };
 
+  // Handle tag creation
+  const onSubmit = async (values: TagFormValues) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Check if the tag name already exists (case insensitive)
+      const normalizedTagName = values.name.trim().toLowerCase();
+      const existingTag = tags.find(tag => 
+        tag.name.toLowerCase().trim() === normalizedTagName
+      );
+      
+      if (existingTag) {
+        toast({
+          title: "Tag already exists",
+          description: `A tag with the name "${existingTag.name}" already exists.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Insert the new tag
+      const { error } = await supabase
+        .from('tags')
+        .insert({
+          name: values.name.trim()
+        });
+      
+      if (error) throw error;
+      
+      // Refresh tags list
+      await fetchTags();
+      
+      // Reset form and close dialog
+      form.reset();
+      setOpenTagDialog(false);
+      
+      toast({
+        title: "Tag created successfully",
+        description: `The tag "${values.name}" has been created.`,
+        variant: "default"
+      });
+      
+    } catch (error: any) {
+      console.error('Error creating tag:', error);
+      toast({
+        title: "Failed to create tag",
+        description: error.message || "There was an error creating the tag",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Filter tags based on search term
   const filteredTags = tags.filter((tag) => {
     return tag.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -230,7 +318,7 @@ const TagsPage = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Tag Management</h1>
-          <Button>
+          <Button onClick={() => setOpenTagDialog(true)}>
             <Tag className="mr-2 h-4 w-4" />
             Add New Tag
           </Button>
@@ -374,6 +462,61 @@ const TagsPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Tag Dialog */}
+      <Dialog open={openTagDialog} onOpenChange={setOpenTagDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Tag</DialogTitle>
+            <DialogDescription>
+              Enter a name for the new tag. Tag names must be unique.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tag Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter tag name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    form.reset();
+                    setOpenTagDialog(false);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    "Creating..."
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Create Tag
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </RoleBasedComponent>
   );
 };
