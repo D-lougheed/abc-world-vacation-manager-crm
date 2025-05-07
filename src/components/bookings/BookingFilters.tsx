@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { BookingStatus, CommissionStatus } from "@/types";
 
-export interface BookingFilters {
+// Export the interface separately from the component
+export interface BookingFiltersType {
   clientSearchTerm: string;
   serviceTypes: string[];
   dateRange: {
@@ -29,7 +30,7 @@ export interface BookingFilters {
   commissionStatuses: CommissionStatus[];
 }
 
-const defaultFilters: BookingFilters = {
+const defaultFilters: BookingFiltersType = {
   clientSearchTerm: "",
   serviceTypes: [],
   dateRange: {
@@ -41,13 +42,13 @@ const defaultFilters: BookingFilters = {
 };
 
 interface BookingFiltersProps {
-  onFilterChange: (filters: BookingFilters) => void;
+  onFilterChange: (filters: BookingFiltersType) => void;
   serviceTypes: { id: string; name: string }[];
 }
 
 const BookingFilters = ({ onFilterChange, serviceTypes }: BookingFiltersProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [filters, setFilters] = useState<BookingFilters>(defaultFilters);
+  const [filters, setFilters] = useState<BookingFiltersType>(defaultFilters);
   
   // Count active filters
   const countActiveFilters = () => {
@@ -60,7 +61,7 @@ const BookingFilters = ({ onFilterChange, serviceTypes }: BookingFiltersProps) =
     return count;
   };
   
-  const handleFilterChange = (newFilters: Partial<BookingFilters>) => {
+  const handleFilterChange = (newFilters: Partial<BookingFiltersType>) => {
     const updatedFilters = { ...filters, ...newFilters };
     setFilters(updatedFilters);
   };

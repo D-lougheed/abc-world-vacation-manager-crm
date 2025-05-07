@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -33,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookingStatus, CommissionStatus } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import BookingFilters, { BookingFilters } from "@/components/bookings/BookingFilters";
+import BookingFilters, { BookingFiltersType } from "@/components/bookings/BookingFilters";
 
 interface BookingWithDetails {
   id: string;
@@ -59,7 +58,7 @@ const BookingsPage = () => {
   const [filteredBookings, setFilteredBookings] = useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string }[]>([]);
-  const [filters, setFilters] = useState<BookingFilters>({
+  const [filters, setFilters] = useState<BookingFiltersType>({
     clientSearchTerm: "",
     serviceTypes: [],
     dateRange: { from: undefined, to: undefined },
@@ -331,7 +330,7 @@ const BookingsPage = () => {
   };
 
   // Handle filter changes
-  const handleFilterChange = (newFilters: BookingFilters) => {
+  const handleFilterChange = (newFilters: BookingFiltersType) => {
     setFilters(newFilters);
   };
 
