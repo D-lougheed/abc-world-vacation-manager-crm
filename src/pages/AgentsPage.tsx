@@ -1,11 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   User,
   UserPlus,
-  UserCog,
-  MailPlus,
+  Edit,
   Check,
   X,
   Shield,
@@ -162,29 +162,6 @@ const AgentsPage = () => {
       case "Admin": return UserRole.Admin;
       case "Agent": 
       default: return UserRole.Agent;
-    }
-  };
-
-  // Handle sending password reset email
-  const handleSendResetEmail = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Password reset email sent",
-        description: "The user will receive instructions to reset their password."
-      });
-    } catch (error: any) {
-      console.error('Error sending reset email:', error);
-      toast({
-        title: "Failed to send reset email",
-        description: error.message || "There was an error sending the reset email",
-        variant: "destructive"
-      });
     }
   };
 
@@ -365,24 +342,17 @@ const AgentsPage = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex space-x-2">
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                disabled={!canManage}
-                                onClick={() => handleEditAgent(agent)}
-                                title={canManage ? "Edit agent" : "Cannot edit users with equal or higher role"}
-                              >
-                                <UserCog className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleSendResetEmail(agent.email)}
-                              >
-                                <MailPlus className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={!canManage}
+                              onClick={() => handleEditAgent(agent)}
+                              title={canManage ? "Edit agent" : "Cannot edit users with equal or higher role"}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Edit
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -492,6 +462,33 @@ const AgentsPage = () => {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">
+                        User Role
+                      </FormLabel>
+                      <FormDescription>
+                        Sets the permission level for this user
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <select
+                        className="h-10 rounded-md border border-input bg-background px-3 py-2"
+                        value={field.value}
+                        onChange={field.onChange}
+                      >
+                        <option value="Agent">Agent</option>
+                        <option value="Admin">Admin</option>
+                        <option value="SuperAdmin">Super Admin</option>
+                      </select>
                     </FormControl>
                   </FormItem>
                 )}
