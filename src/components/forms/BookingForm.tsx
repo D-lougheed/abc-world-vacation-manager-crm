@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -84,6 +83,7 @@ const bookingSchema = z.object({
   isCompleted: z.boolean().default(false),
   tripId: z.string().nullable().optional(),
   rating: z.number().min(0).max(5).optional(),
+  agentId: z.string().nullable().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -149,7 +149,8 @@ const convertTo24HourFormat = (time12: string | null | undefined): string | null
 const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, checkUserAccess } = useAuth();
+  const isAdmin = checkUserAccess(UserRole.Admin);
   
   // State for dropdown options
   const [clientOptions, setClientOptions] = useState<SelectOption[]>([]);
@@ -157,6 +158,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [allServiceTypeOptions, setAllServiceTypeOptions] = useState<SelectOption[]>([]);
   const [serviceTypeOptions, setServiceTypeOptions] = useState<SelectOption[]>([]);
   const [tripOptions, setTripOptions] = useState<SelectOption[]>([]);
+  const [agentOptions, setAgentOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVendorCommissionRate, setSelectedVendorCommissionRate] = useState<number | null>(null);
   const timeOptions = generateTimeOptions();
@@ -179,6 +181,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     isCompleted: false,
     tripId: initialData?.tripId || undefined,
     rating: 0,
+    agentId: initialData?.agentId || user?.id || null,
   };
 
   // Initialize react-hook-form
@@ -232,6 +235,21 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           .order('start_date', { ascending: false });
           
         if (tripsError) throw tripsError;
+
+        // Fetch agents if admin
+        if (isAdmin) {
+          const { data: agents, error: agentsError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .order('last_name');
+            
+          if (agentsError) throw agentsError;
+          
+          setAgentOptions(agents.map(agent => ({
+            value: agent.id,
+            label: `${agent.first_name} ${agent.last_name}`
+          })));
+        }
         
         // Format data for dropdowns
         setClientOptions(clients.map(client => ({
@@ -275,7 +293,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     };
 
     fetchOptions();
-  }, [toast]);
+  }, [toast, isAdmin]);
 
   // If editing an existing booking, fetch its data
   useEffect(() => {
@@ -444,6 +462,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       // Handle the "no_trip" special value
       const tripId = values.tripId === "no_trip" ? null : values.tripId;
       
+      // Use the agentId from form or fallback to current user
+      const agentId = values.agentId || user.id;
+      
       let newBookingId = bookingId;
       
       // Insert or update booking
@@ -468,6 +489,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             notes: values.notes || null,
             trip_id: tripId,
             rating: values.rating || null,
+            agent_id: agentId,
           })
           .eq('id', bookingId);
           
@@ -501,7 +523,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
-            agent_id: user.id,
+            agent_id: agentId,
             rating: values.rating || null,
           })
           .select('id')
@@ -619,6 +641,42 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                     </FormItem>
                   )}
                 />
+                
+                {/* Add Agent field - only editable for admins */}
+                <RoleBasedComponent requiredRole={UserRole.Admin}>
+                  <FormField
+                    control={form.control}
+                    name="agentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assign Agent</FormLabel>
+                        <Select 
+                          disabled={loading} 
+                          onValueChange={field.onChange}
+                          defaultValue={field.value || (user?.id as string)}
+                          value={field.value || (user?.id as string)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an agent" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {agentOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Assign this booking to an agent
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </RoleBasedComponent>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField

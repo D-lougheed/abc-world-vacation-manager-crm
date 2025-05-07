@@ -58,6 +58,7 @@ const EditBookingPage = () => {
           bookingStatus: data.booking_status,
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
+          agentId: data.agent_id,
           tripId: data.trip_id // Preserve as null if it's null
         };
         

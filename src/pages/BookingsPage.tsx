@@ -1,211 +1,203 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { 
-  Search, 
-  FilePlus2,
-  Users,
-  Briefcase,
-  Calendar,
-  Check,
-  X,
-  Clock,
-  Loader2
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow 
-} from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BookingStatus, CommissionStatus } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
-import BookingFilters, { BookingFiltersType } from "@/components/bookings/BookingFilters";
 
-interface BookingWithDetails {
-  id: string;
-  clients: string[];
-  vendor: string;
-  trip?: string;
-  serviceType: string;
-  startDate: string;
-  endDate: string | null;
-  location: string;
-  cost: number;
-  commissionRate: number;
-  commissionAmount: number;
-  bookingStatus: BookingStatus;
-  isCompleted: boolean;
-  commissionStatus: CommissionStatus;
-  agent: string;
-}
+import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Link } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BookingFilters from "@/components/bookings/BookingFilters";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types";
 
 const BookingsPage = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<BookingWithDetails[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string }[]>([]);
-  const [filters, setFilters] = useState<BookingFiltersType>({
-    clientSearchTerm: "",
-    serviceTypes: [],
-    dateRange: { from: undefined, to: undefined },
-    bookingStatuses: [],
-    commissionStatuses: []
+  const [filters, setFilters] = useState({
+    status: "all",
+    dateRange: "all",
+    vendorId: "",
+    serviceTypeId: "",
+    search: "",
   });
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, checkUserAccess } = useAuth();
+  const isAdmin = checkUserAccess(UserRole.Admin);
 
-  // Fetch service types for filter dropdown
-  useEffect(() => {
-    const fetchServiceTypes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('service_types')
-          .select('id, name')
-          .order('name');
-        
-        if (error) throw error;
-        setServiceTypes(data || []);
-      } catch (error: any) {
-        console.error('Error fetching service types:', error);
-        toast({
-          title: "Failed to load service types",
-          description: error.message || "There was an error loading service types",
-          variant: "destructive"
-        });
-      }
-    };
-
-    fetchServiceTypes();
-  }, [toast]);
-
-  // Fetch bookings from Supabase
+  // Fetch bookings with optional filtering
   useEffect(() => {
     const fetchBookings = async () => {
       try {
         setLoading(true);
         
-        // Fetch bookings
-        const { data: bookingsData, error: bookingsError } = await supabase
+        // Start building the query
+        let query = supabase
           .from('bookings')
-          .select('*, service_type_id')
-          .order('start_date', { ascending: false });
+          .select(`
+            *,
+            vendor:vendor_id(name),
+            service_type:service_type_id(name),
+            booking_clients(client_id)
+          `)
+          .order('created_at', { ascending: false });
+
+        // Apply filters
+        if (filters.status !== "all") {
+          query = query.eq('booking_status', filters.status);
+        }
         
-        if (bookingsError) throw bookingsError;
+        // Filter by vendor
+        if (filters.vendorId) {
+          query = query.eq('vendor_id', filters.vendorId);
+        }
         
-        // For each booking, fetch associated clients, vendor, service type, trip, and agent
-        const bookingsWithDetails = await Promise.all((bookingsData || []).map(async (booking) => {
-          // Fetch clients for this booking
-          const { data: bookingClients, error: bookingClientsError } = await supabase
-            .from('booking_clients')
-            .select('client_id')
-            .eq('booking_id', booking.id);
+        // Filter by service type
+        if (filters.serviceTypeId) {
+          query = query.eq('service_type_id', filters.serviceTypeId);
+        }
+
+        // Filter by agent - if user is not admin, only show their bookings
+        if (!isAdmin && user?.id) {
+          query = query.eq('agent_id', user.id);
+        }
+        
+        // Execute the query
+        const { data, error } = await query;
+        
+        if (error) {
+          throw error;
+        }
+        
+        // For each booking, fetch client names
+        const bookingsWithClients = await Promise.all(data.map(async (booking) => {
+          // Get client IDs from booking_clients
+          const clientIds = booking.booking_clients.map((bc: any) => bc.client_id);
           
-          if (bookingClientsError) console.error('Error fetching booking clients:', bookingClientsError);
-          
-          let clientNames: string[] = [];
-          if (bookingClients && bookingClients.length > 0) {
-            const clientIds = bookingClients.map(relation => relation.client_id);
-            const { data: clientsData, error: clientsError } = await supabase
-              .from('clients')
-              .select('first_name, last_name')
-              .in('id', clientIds);
+          // Fetch client details
+          const { data: clientsData, error: clientsError } = await supabase
+            .from('clients')
+            .select('id, first_name, last_name')
+            .in('id', clientIds);
             
-            if (clientsError) console.error('Error fetching clients:', clientsError);
-            clientNames = clientsData ? clientsData.map(client => `${client.first_name} ${client.last_name}`) : [];
+          if (clientsError) {
+            console.error('Error fetching clients:', clientsError);
+            return {
+              ...booking,
+              clients: []
+            };
           }
           
-          // Fetch vendor name
-          let vendorName = "Unknown Vendor";
-          if (booking.vendor_id) {
-            const { data: vendorData, error: vendorError } = await supabase
-              .from('vendors')
-              .select('name')
-              .eq('id', booking.vendor_id)
-              .single();
-            
-            if (vendorError) console.error('Error fetching vendor:', vendorError);
-            if (vendorData) vendorName = vendorData.name;
-          }
+          // Get agent details
+          const { data: agentData, error: agentError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', booking.agent_id)
+            .single();
+
+          const agent = agentError ? null : {
+            name: `${agentData?.first_name || ''} ${agentData?.last_name || ''}`.trim() || 'Unknown'
+          };
           
-          // Fetch service type
-          let serviceTypeName = "Unknown Service";
-          if (booking.service_type_id) {
-            const { data: serviceTypeData, error: serviceTypeError } = await supabase
-              .from('service_types')
-              .select('name')
-              .eq('id', booking.service_type_id)
-              .single();
-            
-            if (serviceTypeError) console.error('Error fetching service type:', serviceTypeError);
-            if (serviceTypeData) serviceTypeName = serviceTypeData.name;
-          }
-          
-          // Fetch trip name if exists
-          let tripName: string | undefined;
-          if (booking.trip_id) {
-            const { data: tripData, error: tripError } = await supabase
-              .from('trips')
-              .select('name')
-              .eq('id', booking.trip_id)
-              .single();
-            
-            if (tripError) console.error('Error fetching trip:', tripError);
-            if (tripData) tripName = tripData.name;
-          }
-          
-          // Fetch agent name
-          let agentName = "Unknown Agent";
-          if (booking.agent_id) {
-            const { data: agentData, error: agentError } = await supabase
-              .from('profiles')
-              .select('first_name, last_name')
-              .eq('id', booking.agent_id)
-              .single();
-            
-            if (agentError) console.error('Error fetching agent:', agentError);
-            if (agentData) agentName = `${agentData.first_name} ${agentData.last_name}`;
-          }
+          const formattedClients = clientsData?.map(client => ({
+            id: client.id,
+            name: `${client.first_name} ${client.last_name}`
+          })) || [];
           
           return {
-            id: booking.id,
-            clients: clientNames,
-            vendor: vendorName,
-            trip: tripName,
-            serviceType: serviceTypeName,
-            startDate: booking.start_date,
-            endDate: booking.end_date,
-            location: booking.location,
-            cost: booking.cost,
-            commissionRate: booking.commission_rate,
-            commissionAmount: booking.commission_amount,
-            bookingStatus: booking.booking_status as BookingStatus,
-            isCompleted: booking.is_completed,
-            commissionStatus: booking.commission_status as CommissionStatus,
-            agent: agentName
+            ...booking,
+            clients: formattedClients,
+            agent
           };
         }));
         
-        setBookings(bookingsWithDetails);
-        setFilteredBookings(bookingsWithDetails);
+        // Apply text search filter on the client side
+        let filteredBookings = bookingsWithClients;
+        if (filters.search) {
+          const searchTerms = filters.search.toLowerCase().split(' ');
+          
+          filteredBookings = filteredBookings.filter(booking => {
+            // Check booking location
+            const matchesLocation = booking.location && 
+              searchTerms.some((term: string) => booking.location.toLowerCase().includes(term));
+              
+            // Check vendor name
+            const matchesVendor = booking.vendor?.name && 
+              searchTerms.some((term: string) => booking.vendor.name.toLowerCase().includes(term));
+              
+            // Check clients' names
+            const matchesClient = booking.clients.some((client: any) => 
+              searchTerms.some((term: string) => client.name.toLowerCase().includes(term))
+            );
+            
+            // Check service type
+            const matchesService = booking.service_type?.name && 
+              searchTerms.some((term: string) => booking.service_type.name.toLowerCase().includes(term));
+              
+            return matchesLocation || matchesVendor || matchesClient || matchesService;
+          });
+        }
+        
+        // Filter by date range
+        if (filters.dateRange !== "all") {
+          const now = new Date();
+          let startDate;
+          
+          if (filters.dateRange === "upcoming") {
+            // Filter for bookings in the future
+            filteredBookings = filteredBookings.filter(booking => {
+              return new Date(booking.start_date) >= now;
+            });
+          } else if (filters.dateRange === "past") {
+            // Filter for past bookings
+            filteredBookings = filteredBookings.filter(booking => {
+              return new Date(booking.start_date) < now;
+            });
+          } else if (filters.dateRange === "today") {
+            // Filter for today's bookings
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            filteredBookings = filteredBookings.filter(booking => {
+              const bookingDate = new Date(booking.start_date);
+              return bookingDate >= today && bookingDate < tomorrow;
+            });
+          } else if (filters.dateRange === "week") {
+            // Filter for this week's bookings
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 7);
+            
+            filteredBookings = filteredBookings.filter(booking => {
+              const bookingDate = new Date(booking.start_date);
+              return bookingDate >= startOfWeek && bookingDate < endOfWeek;
+            });
+          } else if (filters.dateRange === "month") {
+            // Filter for this month's bookings
+            const today = new Date();
+            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            
+            filteredBookings = filteredBookings.filter(booking => {
+              const bookingDate = new Date(booking.start_date);
+              return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
+            });
+          }
+        }
+        
+        setBookings(filteredBookings);
       } catch (error: any) {
         console.error('Error fetching bookings:', error);
         toast({
-          title: "Failed to load bookings",
-          description: error.message || "There was an error loading booking data",
+          title: "Error",
+          description: `Failed to load bookings: ${error.message}`,
           variant: "destructive"
         });
       } finally {
@@ -214,254 +206,107 @@ const BookingsPage = () => {
     };
 
     fetchBookings();
-  }, [toast]);
+  }, [filters, toast, user, isAdmin]);
 
-  // Search and filter bookings based on search term and filters
-  useEffect(() => {
-    const applyFiltersAndSearch = () => {
-      let result = [...bookings];
-      
-      // Apply search term
-      if (searchTerm.trim()) {
-        const searchString = searchTerm.toLowerCase();
-        result = result.filter((booking) => {
-          const clientNames = booking.clients.join(" ").toLowerCase();
-          const vendor = booking.vendor.toLowerCase();
-          const trip = booking.trip?.toLowerCase() || "";
-          const serviceType = booking.serviceType.toLowerCase();
-          const location = booking.location.toLowerCase();
-          
-          return (
-            clientNames.includes(searchString) ||
-            vendor.includes(searchString) ||
-            trip.includes(searchString) ||
-            serviceType.includes(searchString) ||
-            location.includes(searchString)
-          );
-        });
-      }
-      
-      // Apply client search filter
-      if (filters.clientSearchTerm.trim()) {
-        const clientSearch = filters.clientSearchTerm.toLowerCase();
-        result = result.filter(booking => {
-          const clientNames = booking.clients.join(" ").toLowerCase();
-          return clientNames.includes(clientSearch);
-        });
-      }
-      
-      // Apply service type filter
-      if (filters.serviceTypes.length > 0) {
-        result = result.filter(booking => 
-          filters.serviceTypes.includes(booking.serviceType)
-        );
-      }
-      
-      // Apply date range filter
-      if (filters.dateRange.from || filters.dateRange.to) {
-        result = result.filter(booking => {
-          const bookingDate = new Date(booking.startDate);
-          
-          if (filters.dateRange.from && filters.dateRange.to) {
-            return bookingDate >= filters.dateRange.from && 
-                   bookingDate <= filters.dateRange.to;
-          }
-          
-          if (filters.dateRange.from) {
-            return bookingDate >= filters.dateRange.from;
-          }
-          
-          if (filters.dateRange.to) {
-            return bookingDate <= filters.dateRange.to;
-          }
-          
-          return true;
-        });
-      }
-      
-      // Apply booking status filter
-      if (filters.bookingStatuses.length > 0) {
-        result = result.filter(booking => 
-          filters.bookingStatuses.includes(booking.bookingStatus)
-        );
-      }
-      
-      // Apply commission status filter
-      if (filters.commissionStatuses.length > 0) {
-        result = result.filter(booking => 
-          filters.commissionStatuses.includes(booking.commissionStatus)
-        );
-      }
-      
-      setFilteredBookings(result);
-    };
-    
-    applyFiltersAndSearch();
-  }, [bookings, searchTerm, filters]);
-
-  // Function to get booking status badge styling
-  const getBookingStatusBadgeStyle = (status: BookingStatus) => {
-    switch (status) {
-      case BookingStatus.Confirmed:
-        return "bg-green-100 text-green-800";
-      case BookingStatus.Pending:
-        return "bg-yellow-100 text-yellow-800";
-      case BookingStatus.Canceled:
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options as any);
   };
 
-  // Function to get commission status badge styling
-  const getCommissionStatusBadgeStyle = (status: CommissionStatus) => {
+  // Get status badge styling
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case CommissionStatus.Received:
-        return "bg-green-100 text-green-800";
-      case CommissionStatus.Unreceived:
-        return "bg-yellow-100 text-yellow-800";
-      case CommissionStatus.Completed:
-        return "bg-blue-100 text-blue-800";
-      case CommissionStatus.Canceled:
-        return "bg-red-100 text-red-800";
+      case 'Confirmed':
+        return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>;
+      case 'Pending':
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      case 'Canceled':
+        return <Badge className="bg-red-100 text-red-800">Canceled</Badge>;
       default:
-        return "bg-gray-100 text-gray-800";
+        return <Badge variant="outline">{status}</Badge>;
     }
-  };
-
-  // Handle filter changes
-  const handleFilterChange = (newFilters: BookingFiltersType) => {
-    setFilters(newFilters);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Bookings</h1>
-        <Button onClick={() => navigate("/bookings/new")}>
-          <FilePlus2 className="mr-2 h-4 w-4" />
-          Create New Booking
+        
+        <Button asChild>
+          <Link to="/bookings/new">
+            <Plus className="mr-2 h-4 w-4" />
+            New Booking
+          </Link>
         </Button>
       </div>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Booking Management</CardTitle>
-          <CardDescription>View and manage all client bookings</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search bookings..."
-                className="pl-8 w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+      
+      <Separator />
+      
+      <BookingFilters onFilterChange={setFilters} />
+      
+      <Tabs defaultValue="list" className="mt-2">
+        <TabsList>
+          <TabsTrigger value="list">List</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="list">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-            <BookingFilters 
-              onFilterChange={handleFilterChange} 
-              serviceTypes={serviceTypes}
-            />
-          </div>
-
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client(s)</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead>Cost</TableHead>
-                  <TableHead>Commission</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      <div className="flex justify-center items-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-                        <span>Loading bookings...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map((booking) => (
-                    <TableRow 
+          ) : bookings.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No bookings found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4">Date</th>
+                    <th className="text-left py-3 px-4">Clients</th>
+                    <th className="text-left py-3 px-4">Vendor</th>
+                    <th className="text-left py-3 px-4">Service Type</th>
+                    <th className="text-left py-3 px-4">Cost</th>
+                    <th className="text-left py-3 px-4">Status</th>
+                    <th className="text-left py-3 px-4">Agent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((booking) => (
+                    <tr 
                       key={booking.id} 
-                      className="cursor-pointer hover:bg-muted/50" 
-                      onClick={() => navigate(`/bookings/${booking.id}`)}
+                      className="border-b hover:bg-muted/50 cursor-pointer"
+                      onClick={() => window.location.href = `/bookings/${booking.id}`}
                     >
-                      <TableCell>
-                        <div className="font-medium flex items-center gap-1">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>{booking.clients.join(", ") || "No clients"}</span>
-                        </div>
-                        {booking.trip && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {booking.trip}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          <span>{booking.serviceType}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {booking.vendor}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{new Date(booking.startDate).toLocaleDateString()}</span>
-                        </div>
-                        {booking.endDate && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            to {new Date(booking.endDate).toLocaleDateString()}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        ${booking.cost.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {booking.commissionRate}% rate
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-2">
-                          <Badge className={getBookingStatusBadgeStyle(booking.bookingStatus)}>
-                            {booking.isCompleted ? <Check className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
-                            {booking.bookingStatus}
-                          </Badge>
-                          <Badge className={getCommissionStatusBadgeStyle(booking.commissionStatus)} variant="outline">
-                            {booking.commissionStatus}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No bookings found. Try a different search term or create a new booking.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                      <td className="py-3 px-4">{formatDate(booking.start_date)}</td>
+                      <td className="py-3 px-4">
+                        {booking.clients.length > 0 
+                          ? booking.clients.map((client: any) => client.name).join(', ')
+                          : 'No clients'
+                        }
+                      </td>
+                      <td className="py-3 px-4">{booking.vendor?.name || 'Unknown'}</td>
+                      <td className="py-3 px-4">{booking.service_type?.name || 'Unknown'}</td>
+                      <td className="py-3 px-4">${booking.cost.toLocaleString()}</td>
+                      <td className="py-3 px-4">{getStatusBadge(booking.booking_status)}</td>
+                      <td className="py-3 px-4">{booking.agent?.name || 'Unknown'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="calendar">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Calendar view coming soon</p>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
