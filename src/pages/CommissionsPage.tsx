@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -11,6 +10,7 @@ import {
   User,
   ArrowUpDown,
   CalendarClock,
+  FileExcel,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { exportToExcel } from "@/utils/excelExport";
 
 interface Booking {
   id: string;
@@ -72,6 +73,7 @@ const CommissionsPage = () => {
     completedCommission: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -277,6 +279,43 @@ const CommissionsPage = () => {
     }
   };
 
+  // Handle export to Excel
+  const handleExportToExcel = async () => {
+    try {
+      setExporting(true);
+      
+      // Prepare data for export
+      const exportData = filteredBookings.map(booking => ({
+        'Client': booking.client,
+        'Vendor': booking.vendor,
+        'Agent': booking.agent,
+        'Date': new Date(booking.date).toLocaleDateString(),
+        'Booking Status': booking.bookingStatus,
+        'Commission Status': booking.commissionStatus,
+        'Cost ($)': booking.cost,
+        'Commission Rate (%)': booking.commissionRate,
+        'Commission Amount ($)': booking.commissionAmount,
+      }));
+
+      // Generate Excel file
+      exportToExcel(exportData, 'Commissions_Export');
+      
+      toast({
+        title: "Export Successful",
+        description: `${exportData.length} records exported to Excel.`,
+      });
+    } catch (error: any) {
+      console.error('Error exporting to Excel:', error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "There was an error exporting the data",
+        variant: "destructive"
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
       <div className="space-y-6">
@@ -346,10 +385,21 @@ const CommissionsPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button variant="outline" className="w-full md:w-auto">
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
-              </Button>
+              <div className="flex gap-2 w-full md:w-auto">
+                <Button variant="outline" className="flex-1 md:flex-initial">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filters
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 md:flex-initial"
+                  onClick={handleExportToExcel}
+                  disabled={exporting || filteredBookings.length === 0}
+                >
+                  <FileExcel className="mr-2 h-4 w-4" />
+                  {exporting ? 'Exporting...' : 'Export to Excel'}
+                </Button>
+              </div>
             </div>
 
             <div className="rounded-md border overflow-x-auto">
