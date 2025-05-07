@@ -50,7 +50,8 @@ const NewBookingPage = () => {
         // If clientId is provided, use it to populate clients
         else if (clientId) {
           initialDataObj = {
-            clients: [clientId]
+            clients: [clientId],
+            tripId: null // Set to null instead of undefined
           };
         }
         
@@ -65,6 +66,9 @@ const NewBookingPage = () => {
     
     if (tripId || clientId) {
       fetchInitialData();
+    } else {
+      // Set initialData with null tripId when no parameters are provided
+      setInitialData({ tripId: null });
     }
   }, [tripId, clientId]);
   

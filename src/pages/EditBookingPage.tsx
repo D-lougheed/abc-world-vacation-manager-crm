@@ -58,7 +58,7 @@ const EditBookingPage = () => {
           bookingStatus: data.booking_status,
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
-          tripId: data.trip_id || "no_trip"
+          tripId: data.trip_id || null // Use null instead of "no_trip" to avoid UUID conversion issues
         };
         
         setBookingData(formattedData);
