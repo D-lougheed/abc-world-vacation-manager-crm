@@ -458,6 +458,7 @@ export type Database = {
       }
       trips: {
         Row: {
+          agent_id: string | null
           created_at: string
           description: string | null
           end_date: string
@@ -470,6 +471,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_id?: string | null
           created_at?: string
           description?: string | null
           end_date: string
@@ -482,6 +484,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_id?: string | null
           created_at?: string
           description?: string | null
           end_date?: string
@@ -493,7 +496,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["trip_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trips_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_files: {
         Row: {

@@ -28,9 +28,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TripStatus } from "@/types";
+import { TripStatus, UserRole } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TripWithDetails {
   id: string;
@@ -49,6 +50,7 @@ const TripsPage = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch trips from Supabase
   useEffect(() => {
@@ -56,11 +58,22 @@ const TripsPage = () => {
       try {
         setLoading(true);
         
+        if (!user) {
+          return;
+        }
+        
+        // Determine if user is admin
+        const isAdmin = user.role === UserRole.Admin || user.role === UserRole.SuperAdmin;
+        
         // Fetch trips
-        const { data: tripsData, error: tripsError } = await supabase
-          .from('trips')
-          .select('*')
-          .order('start_date', { ascending: false });
+        let tripsQuery = supabase.from('trips').select('*').order('start_date', { ascending: false });
+        
+        // If user is an agent, only show their trips
+        if (!isAdmin) {
+          tripsQuery = tripsQuery.eq('agent_id', user.id);
+        }
+        
+        const { data: tripsData, error: tripsError } = await tripsQuery;
         
         if (tripsError) throw tripsError;
         
@@ -120,7 +133,7 @@ const TripsPage = () => {
     };
 
     fetchTrips();
-  }, [toast]);
+  }, [toast, user]);
 
   // Filter trips based on search term
   const filteredTrips = trips.filter((trip) => {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarCheck, Users, Plane, CreditCard, CalendarClock } from "lucide-react";
@@ -89,20 +88,7 @@ const DashboardPage = () => {
         
         // If user is an agent, only show trips they are assigned to
         if (!isAdmin) {
-          // Get trips where the agent is assigned to any of the bookings
-          const { data: agentTripIds } = await supabase
-            .from('bookings')
-            .select('trip_id')
-            .eq('agent_id', user.id)
-            .not('trip_id', 'is', null);
-          
-          if (agentTripIds && agentTripIds.length > 0) {
-            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
-            activeTripsQuery = activeTripsQuery.in('id', tripIds);
-          } else {
-            // If agent has no trips, return empty array
-            setActiveTrips([]);
-          }
+          activeTripsQuery = activeTripsQuery.eq('agent_id', user.id);
         }
         
         const { data: activeTripsData, error: activeTripsError } = await activeTripsQuery;
@@ -141,20 +127,7 @@ const DashboardPage = () => {
           
         // If user is an agent, only show trips they are assigned to
         if (!isAdmin) {
-          // Get trips where the agent is assigned to any of the bookings
-          const { data: agentTripIds } = await supabase
-            .from('bookings')
-            .select('trip_id')
-            .eq('agent_id', user.id)
-            .not('trip_id', 'is', null);
-            
-          if (agentTripIds && agentTripIds.length > 0) {
-            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
-            upcomingTripsQuery = upcomingTripsQuery.in('id', tripIds);
-          } else {
-            // If agent has no trips, return empty array
-            setUpcomingTrips([]);
-          }
+          upcomingTripsQuery = upcomingTripsQuery.eq('agent_id', user.id);
         }
         
         const { data: upcomingTripsData, error: upcomingTripsError } = await upcomingTripsQuery;
@@ -191,20 +164,7 @@ const DashboardPage = () => {
           
         // If user is an agent, only show trips they are assigned to
         if (!isAdmin) {
-          // Get trips where the agent is assigned to any of the bookings
-          const { data: agentTripIds } = await supabase
-            .from('bookings')
-            .select('trip_id')
-            .eq('agent_id', user.id)
-            .not('trip_id', 'is', null);
-            
-          if (agentTripIds && agentTripIds.length > 0) {
-            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
-            highPriorityTripsQuery = highPriorityTripsQuery.in('id', tripIds);
-          } else {
-            // If agent has no trips, return empty array
-            setHighPriorityTrips([]);
-          }
+          highPriorityTripsQuery = highPriorityTripsQuery.eq('agent_id', user.id);
         }
         
         const { data: highPriorityTripsData, error: highPriorityTripsError } = await highPriorityTripsQuery;
@@ -289,17 +249,7 @@ const DashboardPage = () => {
           .eq('status', 'Ongoing');
         
         if (!isAdmin) {
-          // Get trips where the agent is assigned to any of the bookings
-          const { data: agentTripIds } = await supabase
-            .from('bookings')
-            .select('trip_id')
-            .eq('agent_id', user.id)
-            .not('trip_id', 'is', null);
-            
-          if (agentTripIds && agentTripIds.length > 0) {
-            const tripIds = agentTripIds.map(b => b.trip_id).filter(Boolean);
-            activeTripsCountQuery = activeTripsCountQuery.in('id', tripIds);
-          }
+          activeTripsCountQuery = activeTripsCountQuery.eq('agent_id', user.id);
         }
         
         const { count: activeTripsCount, error: activeTripsCountError } = await activeTripsCountQuery;
