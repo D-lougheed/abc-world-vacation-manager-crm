@@ -492,8 +492,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             cost: values.cost,
             commission_rate: values.commissionRate,
             commission_amount: commissionAmount,
-            booking_status: values.bookingStatus,
-            commission_status: values.commissionStatus,
+            booking_status: values.bookingStatus || 'Pending', // Ensure default value
+            commission_status: values.commissionStatus || 'Unreceived', // Ensure default value
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
@@ -555,8 +555,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           cost: values.cost,
           commission_rate: values.commissionRate,
           commission_amount: commissionAmount,
-          booking_status: values.bookingStatus,
-          commission_status: values.commissionStatus,
+          booking_status: values.bookingStatus || 'Pending', // Ensure default value
+          commission_status: values.commissionStatus || 'Unreceived', // Ensure default value
           is_completed: values.isCompleted,
           notes: values.notes || null,
           trip_id: tripId,
@@ -577,8 +577,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             cost: values.cost,
             commission_rate: values.commissionRate,
             commission_amount: commissionAmount,
-            booking_status: values.bookingStatus,
-            commission_status: values.commissionStatus,
+            booking_status: values.bookingStatus || 'Pending', // Ensure default value
+            commission_status: values.commissionStatus || 'Unreceived', // Ensure default value
             is_completed: values.isCompleted,
             notes: values.notes || null,
             trip_id: tripId,
@@ -591,6 +591,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         if (insertError) {
           console.error("Error inserting booking:", insertError);
           throw insertError;
+        }
+        
+        if (!newBooking) {
+          console.error("No booking ID returned after insert");
+          throw new Error("Failed to create booking - no ID returned");
         }
         
         newBookingId = newBooking.id;

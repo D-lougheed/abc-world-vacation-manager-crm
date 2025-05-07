@@ -7,6 +7,7 @@ import { Loader2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserRole } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
 
 const NewBookingPage = () => {
   const { isAuthenticated, loading: authLoading, user, checkUserAccess } = useAuth();
@@ -15,6 +16,7 @@ const NewBookingPage = () => {
   const [initialData, setInitialData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [agentName, setAgentName] = useState<string>("");
+  const { toast } = useToast();
   const isAdmin = checkUserAccess(UserRole.Admin);
   
   // Extract trip ID and client ID from URL query parameters
@@ -114,6 +116,11 @@ const NewBookingPage = () => {
         
       } catch (error: any) {
         console.error('Error fetching initial data:', error);
+        toast({
+          title: "Error",
+          description: `Failed to load initial data: ${error.message}`,
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
@@ -122,7 +129,7 @@ const NewBookingPage = () => {
     if (user) {
       fetchInitialData();
     }
-  }, [tripId, clientId, user]);
+  }, [tripId, clientId, user, toast]);
   
   // Fetch trips that belong only to the current agent
   useEffect(() => {
