@@ -67,11 +67,13 @@ const NewBookingPage = () => {
         } else {
           // No parameters provided, use current user as agent
           initialDataObj = {
+            clients: [], // Initialize with empty array to avoid undefined
             tripId: null,
             agentId: user?.id
           };
         }
         
+        console.log("Initial data for booking form:", initialDataObj);
         setInitialData(initialDataObj);
         
       } catch (error: any) {
@@ -97,6 +99,7 @@ const NewBookingPage = () => {
     );
   }
   
+  // Only render the form once initialData has been set
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,7 +107,7 @@ const NewBookingPage = () => {
       </div>
       
       <div className="mt-6">
-        <BookingForm initialData={initialData} />
+        {initialData && <BookingForm initialData={initialData} />}
       </div>
     </div>
   );
