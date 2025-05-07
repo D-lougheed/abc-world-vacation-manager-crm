@@ -44,6 +44,9 @@ const EditBookingPage = () => {
           return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
         };
         
+        console.log("Fetched booking data:", data);
+        console.log("Client relationships:", data.booking_clients);
+        
         // Transform the data to match the form's expected format
         const formattedData = {
           ...data,
@@ -62,6 +65,7 @@ const EditBookingPage = () => {
           tripId: data.trip_id // Preserve as null if it's null
         };
         
+        console.log("Formatted booking data for form:", formattedData);
         setBookingData(formattedData);
       } catch (error: any) {
         console.error("Error fetching booking data:", error);

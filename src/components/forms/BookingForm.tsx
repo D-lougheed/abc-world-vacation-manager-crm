@@ -511,6 +511,26 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           
         if (deleteError) throw deleteError;
         
+        // After deleting, wait a brief moment to ensure database consistency
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Only now insert the new client relationships
+        if (values.clients.length > 0) {
+          const clientRelations = values.clients.map(clientId => ({
+            booking_id: bookingId,
+            client_id: clientId
+          }));
+          
+          const { error: clientsError } = await supabase
+            .from('booking_clients')
+            .insert(clientRelations);
+          
+          if (clientsError) {
+            console.error("Error inserting client relations:", clientsError);
+            throw clientsError;
+          }
+        }
+        
       } else {
         // Insert new booking
         console.log("Creating new booking with data:", {
@@ -564,22 +584,22 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         
         newBookingId = newBooking.id;
         console.log("New booking created with ID:", newBookingId);
-      }
       
-      // Insert client relations - Only if we have a valid booking ID
-      if (newBookingId && values.clients.length > 0) {
-        const clientRelations = values.clients.map(clientId => ({
-          booking_id: newBookingId,
-          client_id: clientId
-        }));
-        
-        const { error: clientsError } = await supabase
-          .from('booking_clients')
-          .insert(clientRelations);
+        // For new bookings, insert client relations
+        if (newBookingId && values.clients.length > 0) {
+          const clientRelations = values.clients.map(clientId => ({
+            booking_id: newBookingId,
+            client_id: clientId
+          }));
           
-        if (clientsError) {
-          console.error("Error inserting client relations:", clientsError);
-          throw clientsError;
+          const { error: clientsError } = await supabase
+            .from('booking_clients')
+            .insert(clientRelations);
+            
+          if (clientsError) {
+            console.error("Error inserting client relations:", clientsError);
+            throw clientsError;
+          }
         }
       }
       
