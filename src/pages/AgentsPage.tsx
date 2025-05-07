@@ -50,7 +50,8 @@ import {
   FormItem, 
   FormLabel, 
   FormControl, 
-  FormMessage 
+  FormMessage,
+  FormDescription 
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
