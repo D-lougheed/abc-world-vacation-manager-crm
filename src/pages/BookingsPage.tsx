@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserRole } from "@/types";
+import { UserRole, BookingStatus } from "@/types";
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -26,6 +26,18 @@ const BookingsPage = () => {
   const { toast } = useToast();
   const { user, checkUserAccess } = useAuth();
   const isAdmin = checkUserAccess(UserRole.Admin);
+  
+  // Fetch service types for filters
+  const [serviceTypes, setServiceTypes] = useState<{id: string, name: string}[]>([]);
+  
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      const { data } = await supabase.from('service_types').select('id, name');
+      setServiceTypes(data || []);
+    };
+    
+    fetchServiceTypes();
+  }, []);
 
   // Fetch bookings with optional filtering
   useEffect(() => {
@@ -46,7 +58,7 @@ const BookingsPage = () => {
 
         // Apply filters
         if (filters.status !== "all") {
-          query = query.eq('booking_status', filters.status);
+          query = query.eq('booking_status', filters.status as BookingStatus);
         }
         
         // Filter by vendor
@@ -228,6 +240,18 @@ const BookingsPage = () => {
     }
   };
 
+  // Handle filter changes from BookingFilters component
+  const handleFilterChange = (newFilters: any) => {
+    setFilters({
+      status: newFilters.bookingStatuses.length === 1 ? newFilters.bookingStatuses[0] : "all",
+      dateRange: newFilters.dateRange.from ? "custom" : "all",
+      vendorId: "",
+      serviceTypeId: newFilters.serviceTypes.length === 1 ? 
+        serviceTypes.find(st => st.name === newFilters.serviceTypes[0])?.id || "" : "",
+      search: newFilters.clientSearchTerm
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -243,7 +267,7 @@ const BookingsPage = () => {
       
       <Separator />
       
-      <BookingFilters onFilterChange={setFilters} />
+      <BookingFilters serviceTypes={serviceTypes} onFilterChange={handleFilterChange} />
       
       <Tabs defaultValue="list" className="mt-2">
         <TabsList>
