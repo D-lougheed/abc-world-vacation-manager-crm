@@ -10,7 +10,7 @@ import {
   User,
   ArrowUpDown,
   CalendarClock,
-  FileExcel,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -396,7 +396,7 @@ const CommissionsPage = () => {
                   onClick={handleExportToExcel}
                   disabled={exporting || filteredBookings.length === 0}
                 >
-                  <FileExcel className="mr-2 h-4 w-4" />
+                  <FileText className="mr-2 h-4 w-4" />
                   {exporting ? 'Exporting...' : 'Export to Excel'}
                 </Button>
               </div>
