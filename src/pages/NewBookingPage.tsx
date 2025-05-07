@@ -62,10 +62,10 @@ const NewBookingPage = () => {
           initialDataObj = {
             clients: [clientId],
             tripId: null,
-            agentId: user?.id
+            agentId: user?.id  // Always assign current user as agent
           };
         } else {
-          // No parameters provided
+          // No parameters provided, use current user as agent
           initialDataObj = {
             tripId: null,
             agentId: user?.id
