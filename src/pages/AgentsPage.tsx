@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   User,
@@ -40,6 +40,7 @@ const AgentsPage = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Fetch agents from Supabase
   useEffect(() => {
@@ -143,7 +144,7 @@ const AgentsPage = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Agent Management</h1>
-          <Button>
+          <Button onClick={() => navigate('/admin/agents/new')}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Agent
           </Button>

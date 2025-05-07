@@ -23,6 +23,7 @@ import EditBookingPage from "./pages/EditBookingPage";
 import CommissionsPage from "./pages/CommissionsPage";
 import AdminPage from "./pages/AdminPage";
 import AgentsPage from "./pages/AgentsPage";
+import AddAgentPage from "./pages/AddAgentPage";
 import ServiceTypesPage from "./pages/ServiceTypesPage";
 import TagsPage from "./pages/TagsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="/commissions" element={<CommissionsPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/agents" element={<AgentsPage />} />
+              <Route path="/admin/agents/new" element={<AddAgentPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
             </Route>
