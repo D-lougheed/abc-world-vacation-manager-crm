@@ -166,21 +166,21 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   // Default values for the form
   const defaultValues: Partial<BookingFormValues> = {
     clients: initialData?.clients || [],
-    vendor: "",
-    serviceType: "",
-    startDate: new Date(),
-    startTime: "",
-    endDate: undefined,
-    endTime: "",
-    location: "",
-    cost: 0,
-    commissionRate: 10,
-    notes: "",
-    bookingStatus: BookingStatus.Pending, // Default to Pending
-    commissionStatus: CommissionStatus.Unreceived, // Default to Unreceived
-    isCompleted: false,
+    vendor: initialData?.vendor || "",
+    serviceType: initialData?.serviceType || "",
+    startDate: initialData?.startDate || new Date(),
+    startTime: initialData?.startTime || "",
+    endDate: initialData?.endDate || undefined,
+    endTime: initialData?.endTime || "",
+    location: initialData?.location || "",
+    cost: initialData?.cost || 0,
+    commissionRate: initialData?.commissionRate || 10,
+    notes: initialData?.notes || "",
+    bookingStatus: initialData?.bookingStatus || BookingStatus.Pending, // Default to Pending
+    commissionStatus: initialData?.commissionStatus || CommissionStatus.Unreceived, // Default to Unreceived
+    isCompleted: initialData?.isCompleted || false,
     tripId: initialData?.tripId || undefined,
-    rating: 0,
+    rating: initialData?.rating || 0,
     agentId: initialData?.agentId || user?.id || null,
   };
 
@@ -478,6 +478,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       // Insert or update booking
       if (bookingId) {
         // Update existing booking
+        console.log("Updating booking with ID:", bookingId);
         const { error: updateError } = await supabase
           .from('bookings')
           .update({
@@ -501,7 +502,12 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           })
           .eq('id', bookingId);
           
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Error updating booking:", updateError);
+          throw updateError;
+        }
+        
+        console.log("Booking updated successfully, now handling client relations");
         
         // Delete existing client relations and insert new ones
         const { error: deleteError } = await supabase
@@ -509,7 +515,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           .delete()
           .eq('booking_id', bookingId);
           
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error("Error deleting client relations:", deleteError);
+          throw deleteError;
+        }
         
         // After deleting, wait a brief moment to ensure database consistency
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -520,6 +529,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             booking_id: bookingId,
             client_id: clientId
           }));
+          
+          console.log("Inserting client relations for existing booking:", clientRelations);
           
           const { error: clientsError } = await supabase
             .from('booking_clients')
@@ -591,6 +602,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             booking_id: newBookingId,
             client_id: clientId
           }));
+          
+          console.log("Inserting client relations for new booking:", clientRelations);
           
           const { error: clientsError } = await supabase
             .from('booking_clients')
