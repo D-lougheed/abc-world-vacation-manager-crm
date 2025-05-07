@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -33,14 +34,62 @@ import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Form, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormControl, 
+  FormMessage 
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const AgentsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [agents, setAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [shouldResetPassword, setShouldResetPassword] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Define form schema
+  const formSchema = z.object({
+    first_name: z.string().min(1, "First name is required"),
+    last_name: z.string().min(1, "Last name is required"),
+    email: z.string().email("Invalid email address"),
+    is_active: z.boolean(),
+    password: z.string().optional(),
+    role: z.enum(["SuperAdmin", "Admin", "Agent"]),
+  });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      is_active: true,
+      password: "",
+      role: "Agent" as "SuperAdmin" | "Admin" | "Agent",
+    },
+  });
 
   // Fetch agents from Supabase
   useEffect(() => {
@@ -139,6 +188,89 @@ const AgentsPage = () => {
     }
   };
 
+  // Handle opening edit dialog
+  const handleEditAgent = (agent: any) => {
+    setSelectedAgent(agent);
+    form.reset({
+      first_name: agent.first_name || "",
+      last_name: agent.last_name || "",
+      email: agent.email || "",
+      is_active: agent.is_active || false,
+      password: "",
+      role: agent.role || "Agent",
+    });
+    setShouldResetPassword(false);
+    setEditDialogOpen(true);
+  };
+
+  // Handle agent update
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!selectedAgent) return;
+    
+    try {
+      setUpdateLoading(true);
+      
+      // Update profile in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: values.first_name,
+          last_name: values.last_name,
+          is_active: values.is_active,
+          role: values.role,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedAgent.id);
+      
+      if (profileError) throw profileError;
+
+      // Update email if it has changed
+      if (values.email !== selectedAgent.email) {
+        const { error: emailError } = await supabase.auth.admin.updateUserById(
+          selectedAgent.id,
+          { email: values.email }
+        );
+        
+        if (emailError) throw emailError;
+      }
+      
+      // Update password if provided
+      if (shouldResetPassword && values.password) {
+        const { error: passwordError } = await supabase.auth.admin.updateUserById(
+          selectedAgent.id,
+          { password: values.password }
+        );
+        
+        if (passwordError) throw passwordError;
+      }
+      
+      // Refetch agents to update the view
+      const { data: updatedAgents, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('last_name', { ascending: true });
+      
+      if (fetchError) throw fetchError;
+      
+      setAgents(updatedAgents || []);
+      setEditDialogOpen(false);
+      
+      toast({
+        title: "Agent updated",
+        description: "Agent information has been updated successfully."
+      });
+    } catch (error: any) {
+      console.error('Error updating agent:', error);
+      toast({
+        title: "Failed to update agent",
+        description: error.message || "There was an error updating the agent",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
       <div className="space-y-6">
@@ -226,7 +358,12 @@ const AgentsPage = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button variant="ghost" size="icon" disabled={!canManage}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                disabled={!canManage} 
+                                onClick={() => handleEditAgent(agent)}
+                              >
                                 <UserCog className="h-4 w-4" />
                               </Button>
                               <Button 
@@ -254,6 +391,118 @@ const AgentsPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Agent Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Agent</DialogTitle>
+            <DialogDescription>
+              Update agent information and permissions.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="first_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="last_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="reset-password" 
+                  checked={shouldResetPassword}
+                  onCheckedChange={(checked) => setShouldResetPassword(!!checked)}
+                />
+                <Label htmlFor="reset-password">Change password</Label>
+              </div>
+              {shouldResetPassword && (
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={form.control}
+                name="is_active"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">
+                        Active Status
+                      </FormLabel>
+                      <FormDescription className="text-sm text-muted-foreground">
+                        Inactive users cannot log in to the system
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateLoading}>
+                  {updateLoading ? "Updating..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </RoleBasedComponent>
   );
 };
