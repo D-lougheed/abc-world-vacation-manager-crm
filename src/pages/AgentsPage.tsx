@@ -271,6 +271,17 @@ const AgentsPage = () => {
     }
   };
 
+  // Function to check if current user can manage the target agent
+  const canManageAgent = (agentRole: string): boolean => {
+    if (!user) return false;
+    
+    // Convert string role to UserRole enum
+    const targetAgentRole = getEnumRole(agentRole || "Agent");
+    
+    // Only allow editing if current user role is higher (lower number) than the agent's role
+    return user.role < targetAgentRole;
+  };
+
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
       <div className="space-y-6">
@@ -322,10 +333,7 @@ const AgentsPage = () => {
                     filteredAgents.map((agent) => {
                       if (!agent) return null;
                       const roleBadge = getRoleBadge(agent.role || "Agent");
-                      const agentRole = getEnumRole(agent.role || "Agent");
-                      
-                      // Only allow editing if current user role is higher (lower number) than the agent's role
-                      const canManage = user && user.role < agentRole;
+                      const canManage = canManageAgent(agent.role);
                       
                       return (
                         <TableRow key={agent.id}>
@@ -360,9 +368,9 @@ const AgentsPage = () => {
                             <div className="flex space-x-2">
                               <Button 
                                 variant="ghost" 
-                                size="icon" 
+                                size="icon"
                                 disabled={!canManage}
-                                onClick={() => canManage && handleEditAgent(agent)}
+                                onClick={() => handleEditAgent(agent)}
                                 title={canManage ? "Edit agent" : "Cannot edit users with equal or higher role"}
                               >
                                 <UserCog className="h-4 w-4" />
@@ -475,7 +483,7 @@ const AgentsPage = () => {
                       <FormLabel className="text-base">
                         Active Status
                       </FormLabel>
-                      <FormDescription className="text-sm text-muted-foreground">
+                      <FormDescription>
                         Inactive users cannot log in to the system
                       </FormDescription>
                     </div>
