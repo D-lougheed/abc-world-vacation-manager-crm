@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -11,6 +12,8 @@ import {
   ArrowUpDown,
   CalendarClock,
   FileText,
+  X,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +39,29 @@ import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { exportToExcel } from "@/utils/excelExport";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
+import { RangeSlider } from "@/components/ui/range-slider";
+import {
+  RadioGroup,
+  RadioGroupItem
+} from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface Booking {
   id: string;
@@ -60,6 +86,18 @@ interface CommissionSummary {
   completedCommission: number;
 }
 
+interface Filters {
+  client: string | null;
+  vendor: string | null; 
+  agent: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  bookingStatus: BookingStatus | null;
+  commissionStatus: CommissionStatus | null;
+  minCommission: number;
+  maxCommission: number;
+}
+
 const CommissionsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -76,6 +114,22 @@ const CommissionsPage = () => {
   const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    client: null,
+    vendor: null,
+    agent: null,
+    startDate: null,
+    endDate: null,
+    bookingStatus: null,
+    commissionStatus: null,
+    minCommission: 0,
+    maxCommission: 10000,
+  });
+  const [uniqueClients, setUniqueClients] = useState<string[]>([]);
+  const [uniqueVendors, setUniqueVendors] = useState<string[]>([]);
+  const [uniqueAgents, setUniqueAgents] = useState<string[]>([]);
+  const [maxPossibleCommission, setMaxPossibleCommission] = useState(10000);
 
   // Fetch commissions data from Supabase
   useEffect(() => {
@@ -135,6 +189,19 @@ const CommissionsPage = () => {
         }));
         
         setBookings(processedBookings);
+
+        // Extract unique client, vendor, agent names
+        const clients = [...new Set(processedBookings.map(b => b.client))];
+        const vendors = [...new Set(processedBookings.map(b => b.vendor))];
+        const agents = [...new Set(processedBookings.map(b => b.agent))];
+        setUniqueClients(clients);
+        setUniqueVendors(vendors);
+        setUniqueAgents(agents);
+
+        // Find max commission amount
+        const maxCommission = Math.max(...processedBookings.map(b => b.commissionAmount), 10000);
+        setMaxPossibleCommission(maxCommission);
+        setFilters(prev => ({...prev, maxCommission: maxCommission}));
         
         // Calculate commission summary
         // 1. Total number of bookings
@@ -233,19 +300,85 @@ const CommissionsPage = () => {
     }
   };
 
-  // Filter bookings based on search term
+  // Handle filter changes
+  const handleFilterChange = (key: keyof Filters, value: any) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({
+      client: null,
+      vendor: null,
+      agent: null,
+      startDate: null,
+      endDate: null,
+      bookingStatus: null,
+      commissionStatus: null,
+      minCommission: 0,
+      maxCommission: maxPossibleCommission,
+    });
+    setSearchTerm("");
+  };
+
+  // Get active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.client) count++;
+    if (filters.vendor) count++;
+    if (filters.agent) count++;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
+    if (filters.bookingStatus) count++;
+    if (filters.commissionStatus) count++;
+    if (filters.minCommission > 0 || filters.maxCommission < maxPossibleCommission) count++;
+    return count;
+  };
+
+  // Filter bookings based on search term and filters
   const filteredBookings = bookings.filter((booking) => {
+    // Search term filter
     const client = booking.client.toLowerCase();
     const vendor = booking.vendor.toLowerCase();
     const agent = booking.agent.toLowerCase();
-    
     const searchString = searchTerm.toLowerCase();
     
-    return (
+    const matchesSearch = 
       client.includes(searchString) ||
       vendor.includes(searchString) ||
-      agent.includes(searchString)
-    );
+      agent.includes(searchString);
+    
+    // Apply specific filters
+    const matchesClient = !filters.client || booking.client === filters.client;
+    const matchesVendor = !filters.vendor || booking.vendor === filters.vendor;
+    const matchesAgent = !filters.agent || booking.agent === filters.agent;
+    
+    // Date range filter
+    const bookingDate = new Date(booking.date);
+    const matchesStartDate = !filters.startDate || bookingDate >= filters.startDate;
+    const matchesEndDate = !filters.endDate || bookingDate <= filters.endDate;
+    
+    // Status filters
+    const matchesBookingStatus = !filters.bookingStatus || booking.bookingStatus === filters.bookingStatus;
+    const matchesCommissionStatus = !filters.commissionStatus || booking.commissionStatus === filters.commissionStatus;
+    
+    // Commission amount filter
+    const matchesCommissionAmount = 
+      booking.commissionAmount >= filters.minCommission && 
+      booking.commissionAmount <= filters.maxCommission;
+    
+    return matchesSearch && 
+           matchesClient && 
+           matchesVendor && 
+           matchesAgent && 
+           matchesStartDate && 
+           matchesEndDate && 
+           matchesBookingStatus && 
+           matchesCommissionStatus && 
+           matchesCommissionAmount;
   });
 
   // Function to get commission status badge styling and icon
@@ -386,10 +519,295 @@ const CommissionsPage = () => {
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto">
-                <Button variant="outline" className="flex-1 md:flex-initial">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filters
-                </Button>
+                <Popover open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="flex-1 md:flex-initial">
+                      <Filter className="mr-2 h-4 w-4" />
+                      Filters
+                      {getActiveFilterCount() > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getActiveFilterCount()}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 md:w-96 p-4" align="end">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Filters</h3>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs"
+                          onClick={clearAllFilters}
+                        >
+                          Clear all
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Client</h4>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start">
+                              {filters.client || "Select Client"}
+                              <SlidersHorizontal className="ml-auto h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel>Clients</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                              {uniqueClients.map(client => (
+                                <DropdownMenuCheckboxItem
+                                  key={client}
+                                  checked={filters.client === client}
+                                  onCheckedChange={() => 
+                                    handleFilterChange('client', filters.client === client ? null : client)
+                                  }
+                                >
+                                  {client}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Vendor</h4>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start">
+                              {filters.vendor || "Select Vendor"}
+                              <SlidersHorizontal className="ml-auto h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel>Vendors</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                              {uniqueVendors.map(vendor => (
+                                <DropdownMenuCheckboxItem
+                                  key={vendor}
+                                  checked={filters.vendor === vendor}
+                                  onCheckedChange={() => 
+                                    handleFilterChange('vendor', filters.vendor === vendor ? null : vendor)
+                                  }
+                                >
+                                  {vendor}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Agent</h4>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start">
+                              {filters.agent || "Select Agent"}
+                              <SlidersHorizontal className="ml-auto h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel>Agents</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                              {uniqueAgents.map(agent => (
+                                <DropdownMenuCheckboxItem
+                                  key={agent}
+                                  checked={filters.agent === agent}
+                                  onCheckedChange={() => 
+                                    handleFilterChange('agent', filters.agent === agent ? null : agent)
+                                  }
+                                >
+                                  {agent}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Date Range</h4>
+                        <div className="flex gap-2">
+                          <div className="w-1/2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left",
+                                    !filters.startDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  {filters.startDate ? format(filters.startDate, "PP") : "Start Date"}
+                                  <CalendarClock className="ml-auto h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={filters.startDate || undefined}
+                                  onSelect={(date) => handleFilterChange('startDate', date)}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="w-1/2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left",
+                                    !filters.endDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  {filters.endDate ? format(filters.endDate, "PP") : "End Date"}
+                                  <CalendarClock className="ml-auto h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={filters.endDate || undefined}
+                                  onSelect={(date) => handleFilterChange('endDate', date)}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                        {filters.startDate && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              handleFilterChange('startDate', null);
+                              handleFilterChange('endDate', null);
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Clear dates
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Booking Status</h4>
+                        <RadioGroup 
+                          value={filters.bookingStatus || ''} 
+                          onValueChange={(value) => 
+                            handleFilterChange('bookingStatus', value || null)
+                          }
+                          className="flex flex-wrap gap-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Confirmed" id="confirmed" />
+                            <Label htmlFor="confirmed">Confirmed</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Pending" id="pending" />
+                            <Label htmlFor="pending">Pending</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Canceled" id="canceled" />
+                            <Label htmlFor="canceled">Canceled</Label>
+                          </div>
+                          {filters.bookingStatus && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleFilterChange('bookingStatus', null)}
+                            >
+                              <X className="h-3 w-3 mr-1" /> Clear
+                            </Button>
+                          )}
+                        </RadioGroup>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Commission Status</h4>
+                        <RadioGroup 
+                          value={filters.commissionStatus || ''} 
+                          onValueChange={(value) => 
+                            handleFilterChange('commissionStatus', value || null)
+                          }
+                          className="flex flex-wrap gap-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Received" id="received" />
+                            <Label htmlFor="received">Received</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Unreceived" id="unreceived" />
+                            <Label htmlFor="unreceived">Unreceived</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Completed" id="completed" />
+                            <Label htmlFor="completed">Completed</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Canceled" id="commission-canceled" />
+                            <Label htmlFor="commission-canceled">Canceled</Label>
+                          </div>
+                          {filters.commissionStatus && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleFilterChange('commissionStatus', null)}
+                            >
+                              <X className="h-3 w-3 mr-1" /> Clear
+                            </Button>
+                          )}
+                        </RadioGroup>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Commission Amount</h4>
+                          <span className="text-xs text-muted-foreground">
+                            ${filters.minCommission.toLocaleString()} - ${filters.maxCommission.toLocaleString()}
+                          </span>
+                        </div>
+                        <RangeSlider
+                          defaultValue={[filters.minCommission, filters.maxCommission]}
+                          max={maxPossibleCommission}
+                          step={100}
+                          onValueChange={([min, max]) => {
+                            handleFilterChange('minCommission', min);
+                            handleFilterChange('maxCommission', max);
+                          }}
+                          className="py-4"
+                        />
+                        {(filters.minCommission > 0 || filters.maxCommission < maxPossibleCommission) && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              handleFilterChange('minCommission', 0);
+                              handleFilterChange('maxCommission', maxPossibleCommission);
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Reset range
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                
                 <Button 
                   variant="outline" 
                   className="flex-1 md:flex-initial"
@@ -487,7 +905,10 @@ const CommissionsPage = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No commission data found. Try a different search term.
+                        {getActiveFilterCount() > 0 
+                          ? "No matching bookings found. Try adjusting your filters."
+                          : "No commission data found. Try a different search term."
+                        }
                       </TableCell>
                     </TableRow>
                   )}
