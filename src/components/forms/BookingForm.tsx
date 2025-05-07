@@ -176,8 +176,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     cost: 0,
     commissionRate: 10,
     notes: "",
-    bookingStatus: BookingStatus.Pending,
-    commissionStatus: CommissionStatus.Unreceived,
+    bookingStatus: BookingStatus.Pending, // Default to Pending
+    commissionStatus: CommissionStatus.Unreceived, // Default to Unreceived
     isCompleted: false,
     tripId: initialData?.tripId || undefined,
     rating: 0,
@@ -228,11 +228,18 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           
         if (serviceTypesError) throw serviceTypesError;
         
-        // Fetch trips
-        const { data: trips, error: tripsError } = await supabase
+        // Fetch trips - for agents, only show their own trips
+        let tripsQuery = supabase
           .from('trips')
-          .select('id, name')
-          .order('start_date', { ascending: false });
+          .select('id, name');
+          
+        // If not admin, filter by current user's ID
+        if (!isAdmin && user) {
+          tripsQuery = tripsQuery.eq('agent_id', user.id);
+        }
+        
+        // Order by start date descending
+        const { data: trips, error: tripsError } = await tripsQuery.order('start_date', { ascending: false });
           
         if (tripsError) throw tripsError;
 
@@ -293,7 +300,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     };
 
     fetchOptions();
-  }, [toast, isAdmin]);
+  }, [toast, isAdmin, user]);
 
   // If editing an existing booking, fetch its data
   useEffect(() => {
@@ -444,6 +451,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const onSubmit = async (values: BookingFormValues) => {
     try {
       setLoading(true);
+      console.log("Form submitted with values:", values); // Log form values for debugging
 
       // Calculate commission amount based on cost and rate
       const commissionAmount = (values.cost * values.commissionRate) / 100;
@@ -505,6 +513,26 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         
       } else {
         // Insert new booking
+        console.log("Creating new booking with data:", {
+          vendor_id: values.vendor,
+          service_type_id: values.serviceType,
+          start_date: values.startDate.toISOString().split('T')[0],
+          start_time: start_time,
+          end_date: values.endDate ? values.endDate.toISOString().split('T')[0] : null,
+          end_time: end_time,
+          location: values.location,
+          cost: values.cost,
+          commission_rate: values.commissionRate,
+          commission_amount: commissionAmount,
+          booking_status: values.bookingStatus,
+          commission_status: values.commissionStatus,
+          is_completed: values.isCompleted,
+          notes: values.notes || null,
+          trip_id: tripId,
+          agent_id: agentId,
+          rating: values.rating || null,
+        });
+
         const { data: newBooking, error: insertError } = await supabase
           .from('bookings')
           .insert({
@@ -529,9 +557,13 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           .select('id')
           .single();
           
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("Error inserting booking:", insertError);
+          throw insertError;
+        }
         
         newBookingId = newBooking.id;
+        console.log("New booking created with ID:", newBookingId);
       }
       
       // Insert client relations - Only if we have a valid booking ID
@@ -545,7 +577,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
           .from('booking_clients')
           .insert(clientRelations);
           
-        if (clientsError) throw clientsError;
+        if (clientsError) {
+          console.error("Error inserting client relations:", clientsError);
+          throw clientsError;
+        }
       }
       
       // If the booking is completed and has a rating, update the vendor's rating

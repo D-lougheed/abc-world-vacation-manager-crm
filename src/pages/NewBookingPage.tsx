@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import BookingForm from "@/components/forms/BookingForm";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { UserRole } from "@/types";
 
 const NewBookingPage = () => {
-  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, user, checkUserAccess } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [initialData, setInitialData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const isAdmin = checkUserAccess(UserRole.Admin);
   
   // Extract trip ID and client ID from URL query parameters
   const queryParams = new URLSearchParams(location.search);
