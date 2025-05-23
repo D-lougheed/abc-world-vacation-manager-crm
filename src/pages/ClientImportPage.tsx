@@ -8,8 +8,18 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import RoleBasedComponent from "@/components/RoleBasedComponent";
-import { UserRole, Client } from "@/types";
+import { UserRole } from "@/types";
 import { ArrowLeft, UploadCloud } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types'; // Import Database type
+
+type ClientInsertRecord = Database['public']['Tables']['clients']['Insert'];
+
+// Define the expected shape of a row from the CSV
+interface ClientCsvRow {
+  firstName?: string;
+  lastName?: string;
+  [key: string]: any; // Allow other potential CSV columns
+}
 
 const ClientImportPage = () => {
   const navigate = useNavigate();
@@ -30,7 +40,7 @@ const ClientImportPage = () => {
     }
   };
 
-  const validateRow = (row: any, rowIndex: number): Partial<Client> | null => {
+  const validateRow = (row: ClientCsvRow, rowIndex: number): ClientInsertRecord | null => {
     const { firstName, lastName } = row;
     if (!firstName || typeof firstName !== 'string' || firstName.trim() === '') {
       setErrors(prev => [...prev, `Row ${rowIndex + 1}: firstName is required and must be a non-empty string.`]);
@@ -40,7 +50,12 @@ const ClientImportPage = () => {
       setErrors(prev => [...prev, `Row ${rowIndex + 1}: lastName is required and must be a non-empty string.`]);
       return null;
     }
-    return { firstName: firstName.trim(), lastName: lastName.trim() };
+    // Map to database schema (snake_case)
+    return { 
+      first_name: firstName.trim(), 
+      last_name: lastName.trim() 
+      // If importing notes, add: notes: row.notes ? row.notes.trim() : undefined 
+    };
   };
 
   const handleImport = async () => {
@@ -58,7 +73,7 @@ const ClientImportPage = () => {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const parsedData = results.data;
+        const parsedData = results.data as ClientCsvRow[];
         const fileHeaders = results.meta.fields;
 
         if (!fileHeaders || !requiredHeaders.every(header => fileHeaders.includes(header))) {
@@ -71,11 +86,11 @@ const ClientImportPage = () => {
           return;
         }
 
-        const validClients: Partial<Client>[] = [];
+        const validClients: ClientInsertRecord[] = [];
         let currentErrorCount = 0;
 
         for (let i = 0; i < parsedData.length; i++) {
-          const row = parsedData[i] as any;
+          const row = parsedData[i];
           const clientData = validateRow(row, i);
           if (clientData) {
             validClients.push(clientData);
@@ -87,7 +102,8 @@ const ClientImportPage = () => {
         setErrorCount(currentErrorCount);
 
         if (validClients.length > 0) {
-          const { error: dbError } = await supabase.from('clients').insert(validClients as Client[]); // Assuming direct insert is fine
+          // Insert data matching the DB schema, remove incorrect type assertion
+          const { error: dbError } = await supabase.from('clients').insert(validClients); 
           if (dbError) {
             toast({ title: "Import Error", description: `Failed to import clients: ${dbError.message}`, variant: "destructive" });
             setErrors(prev => [...prev, `Database error: ${dbError.message}`]);
@@ -123,7 +139,7 @@ const ClientImportPage = () => {
               <UploadCloud className="mr-2 h-5 w-5 text-primary" /> Import Clients
             </CardTitle>
             <CardDescription>
-              Upload a CSV file to bulk import clients. The CSV file must include headers: <code>firstName</code>, <code>lastName</code>.
+              Upload a CSV file to bulk import clients. The CSV file must include headers: <code>{requiredHeaders.join(", ")}</code>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -158,3 +174,4 @@ const ClientImportPage = () => {
 };
 
 export default ClientImportPage;
+
