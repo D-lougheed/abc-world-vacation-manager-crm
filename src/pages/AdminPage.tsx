@@ -6,6 +6,7 @@ import {
   Tags,
   Briefcase,
   ArrowRight,
+  UploadCloud, // Added for Mass Import
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,6 +82,25 @@ const AdminPage = () => {
               </p>
               <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
                 <span>Manage Tags</span>
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/import")}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center">
+                <UploadCloud className="mr-2 h-5 w-5 text-primary" />
+                Mass Import
+              </CardTitle>
+              <CardDescription>Import data from CSV files</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Bulk import Clients, Vendors, Service Types, and Tags using CSV files.
+              </p>
+              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                <span>Go to Mass Import</span>
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>

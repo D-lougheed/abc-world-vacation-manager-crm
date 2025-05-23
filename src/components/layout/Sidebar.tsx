@@ -13,7 +13,8 @@ import {
   CalendarCheck,
   CreditCard,
   Settings,
-  Plane
+  Plane,
+  UploadCloud, // Added for Mass Import
 } from "lucide-react";
 import RoleBasedComponent from "../RoleBasedComponent";
 
@@ -46,12 +47,12 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 
 const Sidebar = () => {
   const { isSidebarOpen } = useSidebar();
-  const { checkUserAccess } = useAuth();
+  const { checkUserAccess } = useAuth(); // checkUserAccess is defined in AuthContext
   const location = useLocation();
   const pathname = location.pathname;
 
   // Only show admin pages to admins and super admins
-  const canAccessAdmin = checkUserAccess(UserRole.Admin);
+  const canAccessAdmin = checkUserAccess(UserRole.Admin); // Assuming checkUserAccess returns boolean
 
   if (!isSidebarOpen) return null;
 
@@ -103,10 +104,16 @@ const Sidebar = () => {
             active={pathname === "/commissions"}
           />
           <SidebarItem
+            icon={UploadCloud} // Changed Icon
+            label="Mass Import" // New Item
+            to="/admin/import"
+            active={pathname.startsWith("/admin/import")}
+          />
+          <SidebarItem
             icon={Settings}
             label="Admin Panel"
             to="/admin"
-            active={pathname.startsWith("/admin")}
+            active={pathname === "/admin" && !pathname.startsWith("/admin/import")} // Ensure Admin Panel is not active when on import pages
           />
         </RoleBasedComponent>
       </nav>
