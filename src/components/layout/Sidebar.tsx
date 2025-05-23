@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -47,7 +46,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 
 const Sidebar = () => {
   const { isSidebarOpen } = useSidebar();
-  const { checkUserAccess } = useAuth(); // checkUserAccess is defined in AuthContext
+  const { checkUserAccess } = useAuth(); 
   const location = useLocation();
   const pathname = location.pathname;
 
@@ -104,16 +103,10 @@ const Sidebar = () => {
             active={pathname === "/commissions"}
           />
           <SidebarItem
-            icon={UploadCloud} // Changed Icon
-            label="Mass Import" // New Item
-            to="/admin/import"
-            active={pathname.startsWith("/admin/import")}
-          />
-          <SidebarItem
             icon={Settings}
             label="Admin Panel"
             to="/admin"
-            active={pathname === "/admin" && !pathname.startsWith("/admin/import")} // Ensure Admin Panel is not active when on import pages
+            active={pathname === "/admin" && !pathname.startsWith("/admin/import")} // Kept original active logic as it's specific
           />
         </RoleBasedComponent>
       </nav>

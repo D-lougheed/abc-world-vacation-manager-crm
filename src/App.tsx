@@ -30,6 +30,13 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
+// Import pages for Mass Import
+import AdminImportOverviewPage from "./pages/AdminImportOverviewPage";
+import ClientImportPage from "./pages/ClientImportPage";
+import VendorImportPage from "./pages/VendorImportPage";
+import ServiceTypeImportPage from "./pages/ServiceTypeImportPage";
+import TagImportPage from "./pages/TagImportPage";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -72,11 +79,20 @@ const App = () => (
               <Route path="/bookings/:id" element={<BookingDetailPage />} />
               <Route path="/bookings/:id/edit" element={<EditBookingPage />} />
               <Route path="/commissions" element={<CommissionsPage />} />
+              
+              {/* Admin Routes */}
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/agents" element={<AgentsPage />} />
               <Route path="/admin/agents/new" element={<AddAgentPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
+
+              {/* Mass Import Routes */}
+              <Route path="/admin/import" element={<AdminImportOverviewPage />} />
+              <Route path="/admin/import/clients" element={<ClientImportPage />} />
+              <Route path="/admin/import/vendors" element={<VendorImportPage />} />
+              <Route path="/admin/import/service-types" element={<ServiceTypeImportPage />} />
+              <Route path="/admin/import/tags" element={<TagImportPage />} />
             </Route>
             
             <Route path="*" element={<NotFound />} />
