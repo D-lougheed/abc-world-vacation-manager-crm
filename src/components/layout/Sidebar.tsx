@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -13,8 +14,8 @@ import {
   CreditCard,
   Settings,
   Plane,
-  UploadCloud,
-  FileText,
+  // UploadCloud, // No longer used directly in sidebar for a top-level item
+  // FileText, // No longer used directly in sidebar for a top-level item
 } from "lucide-react";
 import RoleBasedComponent from "../RoleBasedComponent";
 
@@ -51,7 +52,7 @@ const Sidebar = () => {
   const location = useLocation();
   const pathname = location.pathname;
 
-  const canAccessAdmin = checkUserAccess(UserRole.Admin); 
+  // const canAccessAdmin = checkUserAccess(UserRole.Admin); // This variable is declared but not used. Can be removed if not needed elsewhere.
 
   if (!isSidebarOpen) return null;
 
@@ -106,14 +107,11 @@ const Sidebar = () => {
             icon={Settings}
             label="Admin Panel"
             to="/admin"
-            active={pathname.startsWith("/admin") && !pathname.startsWith("/admin/import") && !pathname.startsWith("/admin/audit-logs")}
+            active={pathname.startsWith("/admin") && !pathname.startsWith("/admin/import")}
           />
-          <SidebarItem
-            icon={FileText}
-            label="Audit Logs"
-            to="/admin/audit-logs"
-            active={pathname === "/admin/audit-logs"}
-          />
+          {/* The SidebarItem for Audit Logs has been removed. */}
+          {/* Access to Audit Logs is now through the Admin Panel page. */}
+          {/* The Admin Panel link above will be active when on /admin/audit-logs */}
         </RoleBasedComponent>
       </nav>
     </aside>
