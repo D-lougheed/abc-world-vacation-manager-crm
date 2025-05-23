@@ -43,6 +43,12 @@ const AdminAuditLogPage = () => {
   });
 
   const [selectedLogDetails, setSelectedLogDetails] = useState<Record<string, any> | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleViewDetails = (details: Record<string, any> | null) => {
+    setSelectedLogDetails(details);
+    setIsDialogOpen(true);
+  };
 
   return (
     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
@@ -91,20 +97,25 @@ const AdminAuditLogPage = () => {
                       <TableCell>{log.resource_id || 'N/A'}</TableCell>
                       <TableCell>
                         {log.details && (
-                          <Dialog>
+                          <Dialog open={isDialogOpen && selectedLogDetails === log.details} onOpenChange={(open) => {
+                            if (!open) {
+                              setIsDialogOpen(false);
+                              setSelectedLogDetails(null);
+                            }
+                          }}>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="xs" onClick={() => setSelectedLogDetails(log.details)}>View</Button>
+                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(log.details)}>View</Button>
                             </DialogTrigger>
-                            {selectedLogDetails === log.details && (
-                               <DialogContent className="sm:max-w-[600px]">
-                                <DialogHeader>
-                                  <DialogTitle>Log Details</DialogTitle>
-                                </DialogHeader>
+                            <DialogContent className="sm:max-w-[600px]">
+                              <DialogHeader>
+                                <DialogTitle>Log Details</DialogTitle>
+                              </DialogHeader>
+                              {selectedLogDetails && (
                                 <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 overflow-x-auto">
                                   <code className="text-white">{JSON.stringify(selectedLogDetails, null, 2)}</code>
                                 </pre>
-                              </DialogContent>
-                            )}
+                              )}
+                            </DialogContent>
                           </Dialog>
                         )}
                       </TableCell>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
@@ -88,7 +89,7 @@ const ClientImportPage = () => {
             variant: "destructive",
           });
           setIsImporting(false);
-          if (currentUser) {
+          if (currentUser && file) { // file check added for safety
             await addAuditLog(currentUser, {
               action: 'IMPORT_CLIENTS_FAILED',
               resourceType: 'Client',
@@ -120,7 +121,7 @@ const ClientImportPage = () => {
             toast({ title: "Import Error", description: errorMsg, variant: "destructive" });
             setErrors(prev => [...prev, `Database error: ${dbError.message}`]);
             setErrorCount(prev => prev + validClients.length);
-            if (currentUser) {
+            if (currentUser && file) { // file check added for safety
               await addAuditLog(currentUser, {
                 action: 'IMPORT_CLIENTS_DB_ERROR',
                 resourceType: 'Client',
@@ -130,7 +131,7 @@ const ClientImportPage = () => {
           } else {
             setImportedCount(validClients.length);
             toast({ title: "Import Successful", description: `${validClients.length} clients imported successfully.` });
-            if (currentUser) {
+            if (currentUser && file) { // file check added for safety
               await addAuditLog(currentUser, {
                 action: 'IMPORT_CLIENTS_SUCCESS',
                 resourceType: 'Client',
@@ -140,7 +141,7 @@ const ClientImportPage = () => {
           }
         } else if (currentErrorCount > 0) {
              toast({ title: "Import Failed", description: "No valid client data found in the CSV.", variant: "destructive" });
-             if (currentUser) {
+             if (currentUser && file) { // file check added for safety
                 await addAuditLog(currentUser, {
                   action: 'IMPORT_CLIENTS_NO_VALID_DATA',
                   resourceType: 'Client',
@@ -149,7 +150,7 @@ const ClientImportPage = () => {
               }
         } else {
             toast({ title: "Empty CSV", description: "The CSV file is empty or contains no valid data.", variant: "default" });
-            if (currentUser) {
+            if (currentUser && file) { // file check added for safety
                 await addAuditLog(currentUser, {
                   action: 'IMPORT_CLIENTS_EMPTY_CSV',
                   resourceType: 'Client',
@@ -159,12 +160,12 @@ const ClientImportPage = () => {
         }
         setIsImporting(false);
       },
-      error: (error) => {
+      error: async (error) => { // Made this callback async
         const errorMsg = `Error parsing CSV: ${error.message}`;
         toast({ title: "Parsing Error", description: errorMsg, variant: "destructive" });
         setErrors(prev => [...prev, `CSV Parsing error: ${error.message}`]);
         setIsImporting(false);
-        if (currentUser) {
+        if (currentUser && file) { // file check added for safety
           await addAuditLog(currentUser, {
             action: 'IMPORT_CLIENTS_PARSE_ERROR',
             resourceType: 'Client',
