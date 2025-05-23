@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
@@ -41,6 +40,8 @@ const ClientImportPage = () => {
   };
 
   const validateRow = (row: ClientCsvRow, rowIndex: number): ClientInsertRecord | null => {
+    // Accessing row.firstName (etc.) will now use the trimmed header names as keys
+    // if transformHeader is applied during parsing.
     const { firstName, lastName } = row;
     if (!firstName || typeof firstName !== 'string' || firstName.trim() === '') {
       setErrors(prev => [...prev, `Row ${rowIndex + 1}: firstName is required and must be a non-empty string.`]);
@@ -52,8 +53,8 @@ const ClientImportPage = () => {
     }
     // Map to database schema (snake_case)
     return { 
-      first_name: firstName.trim(), 
-      last_name: lastName.trim() 
+      first_name: firstName.trim(), // Value trimming is still good
+      last_name: lastName.trim()  // Value trimming is still good
       // If importing notes, add: notes: row.notes ? row.notes.trim() : undefined 
     };
   };
@@ -72,8 +73,10 @@ const ClientImportPage = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: header => header.trim(), // Trim whitespace from headers
       complete: async (results) => {
         const parsedData = results.data as ClientCsvRow[];
+        // results.meta.fields will contain the transformed (trimmed) headers
         const fileHeaders = results.meta.fields;
 
         if (!fileHeaders || !requiredHeaders.every(header => fileHeaders.includes(header))) {
@@ -102,12 +105,11 @@ const ClientImportPage = () => {
         setErrorCount(currentErrorCount);
 
         if (validClients.length > 0) {
-          // Insert data matching the DB schema, remove incorrect type assertion
           const { error: dbError } = await supabase.from('clients').insert(validClients); 
           if (dbError) {
             toast({ title: "Import Error", description: `Failed to import clients: ${dbError.message}`, variant: "destructive" });
             setErrors(prev => [...prev, `Database error: ${dbError.message}`]);
-            setErrorCount(prev => prev + validClients.length); // All these failed if DB error
+            setErrorCount(prev => prev + validClients.length);
           } else {
             setImportedCount(validClients.length);
             toast({ title: "Import Successful", description: `${validClients.length} clients imported successfully.` });
@@ -174,4 +176,3 @@ const ClientImportPage = () => {
 };
 
 export default ClientImportPage;
-
