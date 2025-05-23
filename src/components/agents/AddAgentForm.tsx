@@ -1,14 +1,15 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UserRole } from "@/types";
+import { UserRole, User as AuthUserType } from "@/types"; // Renamed User to AuthUserType to avoid conflict
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { addAuditLog } from "@/services/AuditLogService"; // Import the audit log service
 import {
   Form,
   FormControl,
@@ -46,6 +47,7 @@ const AddAgentForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth(); // Get the current authenticated user
 
   // Initialize form with default values
   const form = useForm<FormValues>({
@@ -89,11 +91,21 @@ const AddAgentForm = () => {
       });
       
       console.log("Response status:", response.status);
-      const data = await response.json();
-      console.log("Response data:", data);
+      const responseData = await response.json(); // Changed variable name from data to responseData
+      console.log("Response data:", responseData);
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create agent");
+        throw new Error(responseData.error || "Failed to create agent");
+      }
+
+      // Add audit log
+      if (currentUser && responseData.user?.id) {
+        await addAuditLog(currentUser, {
+          action: 'CREATE_AGENT',
+          resourceType: 'Agent',
+          resourceId: responseData.user.id, // ID of the created agent user
+          details: { email: values.email, role: values.role },
+        });
       }
 
       toast({
@@ -110,6 +122,14 @@ const AddAgentForm = () => {
         description: error.message || "There was an error creating the agent",
         variant: "destructive",
       });
+      // Optionally log the failure as well
+      if (currentUser) {
+        await addAuditLog(currentUser, {
+          action: 'CREATE_AGENT_FAILED',
+          resourceType: 'Agent',
+          details: { email: values.email, error: error.message },
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }

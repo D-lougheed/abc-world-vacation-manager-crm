@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +35,9 @@ import ClientImportPage from "./pages/ClientImportPage";
 import VendorImportPage from "./pages/VendorImportPage";
 import ServiceTypeImportPage from "./pages/ServiceTypeImportPage";
 import TagImportPage from "./pages/TagImportPage";
+
+// Import Audit Log Page
+import AdminAuditLogPage from "./pages/AdminAuditLogPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +88,7 @@ const App = () => (
               <Route path="/admin/agents/new" element={<AddAgentPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
+              <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} /> {/* New Route */}
 
               {/* Mass Import Routes */}
               <Route path="/admin/import" element={<AdminImportOverviewPage />} />

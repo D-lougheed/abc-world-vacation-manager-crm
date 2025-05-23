@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { 
   Settings,
@@ -6,7 +5,8 @@ import {
   Tags,
   Briefcase,
   ArrowRight,
-  UploadCloud, // Added for Mass Import
+  UploadCloud,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,6 +101,25 @@ const AdminPage = () => {
               </p>
               <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
                 <span>Go to Mass Import</span>
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/audit-logs")}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center">
+                <FileText className="mr-2 h-5 w-5 text-primary" />
+                Audit Logs
+              </CardTitle>
+              <CardDescription>View system event logs and user actions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Track important activities like record creation, imports, and administrative changes.
+              </p>
+              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                <span>View Audit Logs</span>
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>

@@ -13,7 +13,8 @@ import {
   CreditCard,
   Settings,
   Plane,
-  UploadCloud, // Added for Mass Import
+  UploadCloud,
+  FileText,
 } from "lucide-react";
 import RoleBasedComponent from "../RoleBasedComponent";
 
@@ -50,8 +51,7 @@ const Sidebar = () => {
   const location = useLocation();
   const pathname = location.pathname;
 
-  // Only show admin pages to admins and super admins
-  const canAccessAdmin = checkUserAccess(UserRole.Admin); // Assuming checkUserAccess returns boolean
+  const canAccessAdmin = checkUserAccess(UserRole.Admin); 
 
   if (!isSidebarOpen) return null;
 
@@ -106,7 +106,13 @@ const Sidebar = () => {
             icon={Settings}
             label="Admin Panel"
             to="/admin"
-            active={pathname === "/admin" && !pathname.startsWith("/admin/import")} // Kept original active logic as it's specific
+            active={pathname.startsWith("/admin") && !pathname.startsWith("/admin/import") && !pathname.startsWith("/admin/audit-logs")}
+          />
+          <SidebarItem
+            icon={FileText}
+            label="Audit Logs"
+            to="/admin/audit-logs"
+            active={pathname === "/admin/audit-logs"}
           />
         </RoleBasedComponent>
       </nav>

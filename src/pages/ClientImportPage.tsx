@@ -9,15 +9,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { UserRole } from "@/types";
 import { ArrowLeft, UploadCloud } from 'lucide-react';
-import type { Database } from '@/integrations/supabase/types'; // Import Database type
+import type { Database } from '@/integrations/supabase/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { addAuditLog } from '@/services/AuditLogService';
 
 type ClientInsertRecord = Database['public']['Tables']['clients']['Insert'];
 
-// Define the expected shape of a row from the CSV
 interface ClientCsvRow {
   firstName?: string;
   lastName?: string;
-  [key: string]: any; // Allow other potential CSV columns
+  [key: string]: any; 
 }
 
 const ClientImportPage = () => {
@@ -27,6 +28,7 @@ const ClientImportPage = () => {
   const [importedCount, setImportedCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
+  const { user: currentUser } = useAuth();
 
   const requiredHeaders = ['firstName', 'lastName'];
 
@@ -73,19 +75,26 @@ const ClientImportPage = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: header => header.trim(), // Trim whitespace from headers
+      transformHeader: header => header.trim(),
       complete: async (results) => {
         const parsedData = results.data as ClientCsvRow[];
-        // results.meta.fields will contain the transformed (trimmed) headers
         const fileHeaders = results.meta.fields;
 
         if (!fileHeaders || !requiredHeaders.every(header => fileHeaders.includes(header))) {
+          const errorMsg = `CSV must contain the following headers: ${requiredHeaders.join(', ')}. Found: ${fileHeaders?.join(', ')}`;
           toast({
             title: "Invalid CSV Headers",
-            description: `CSV must contain the following headers: ${requiredHeaders.join(', ')}. Found: ${fileHeaders?.join(', ')}`,
+            description: errorMsg,
             variant: "destructive",
           });
           setIsImporting(false);
+          if (currentUser) {
+            await addAuditLog(currentUser, {
+              action: 'IMPORT_CLIENTS_FAILED',
+              resourceType: 'Client',
+              details: { fileName: file.name, reason: 'Invalid headers', error: errorMsg },
+            });
+          }
           return;
         }
 
@@ -107,24 +116,61 @@ const ClientImportPage = () => {
         if (validClients.length > 0) {
           const { error: dbError } = await supabase.from('clients').insert(validClients); 
           if (dbError) {
-            toast({ title: "Import Error", description: `Failed to import clients: ${dbError.message}`, variant: "destructive" });
+            const errorMsg = `Failed to import clients: ${dbError.message}`;
+            toast({ title: "Import Error", description: errorMsg, variant: "destructive" });
             setErrors(prev => [...prev, `Database error: ${dbError.message}`]);
             setErrorCount(prev => prev + validClients.length);
+            if (currentUser) {
+              await addAuditLog(currentUser, {
+                action: 'IMPORT_CLIENTS_DB_ERROR',
+                resourceType: 'Client',
+                details: { fileName: file.name, error: dbError.message, attemptedCount: validClients.length },
+              });
+            }
           } else {
             setImportedCount(validClients.length);
             toast({ title: "Import Successful", description: `${validClients.length} clients imported successfully.` });
+            if (currentUser) {
+              await addAuditLog(currentUser, {
+                action: 'IMPORT_CLIENTS_SUCCESS',
+                resourceType: 'Client',
+                details: { fileName: file.name, importedCount: validClients.length, errorCount: currentErrorCount },
+              });
+            }
           }
         } else if (currentErrorCount > 0) {
              toast({ title: "Import Failed", description: "No valid client data found in the CSV.", variant: "destructive" });
+             if (currentUser) {
+                await addAuditLog(currentUser, {
+                  action: 'IMPORT_CLIENTS_NO_VALID_DATA',
+                  resourceType: 'Client',
+                  details: { fileName: file.name, errorCount: currentErrorCount },
+                });
+              }
         } else {
             toast({ title: "Empty CSV", description: "The CSV file is empty or contains no valid data.", variant: "default" });
+            if (currentUser) {
+                await addAuditLog(currentUser, {
+                  action: 'IMPORT_CLIENTS_EMPTY_CSV',
+                  resourceType: 'Client',
+                  details: { fileName: file.name },
+                });
+              }
         }
         setIsImporting(false);
       },
       error: (error) => {
-        toast({ title: "Parsing Error", description: `Error parsing CSV: ${error.message}`, variant: "destructive" });
+        const errorMsg = `Error parsing CSV: ${error.message}`;
+        toast({ title: "Parsing Error", description: errorMsg, variant: "destructive" });
         setErrors(prev => [...prev, `CSV Parsing error: ${error.message}`]);
         setIsImporting(false);
+        if (currentUser) {
+          await addAuditLog(currentUser, {
+            action: 'IMPORT_CLIENTS_PARSE_ERROR',
+            resourceType: 'Client',
+            details: { fileName: file.name, error: error.message },
+          });
+        }
       }
     });
   };
