@@ -14,6 +14,7 @@ const ProfilePage = () => {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  // agentCommissionPercentage is still needed to display the value from the user object
   const [agentCommissionPercentage, setAgentCommissionPercentage] = useState<number | null | undefined>(undefined);
   
   const [isSaving, setIsSaving] = useState(false);
@@ -30,26 +31,17 @@ const ProfilePage = () => {
     if (!user) return;
     setIsSaving(true);
 
-    const commission = agentCommissionPercentage === undefined || agentCommissionPercentage === null ? null : Number(agentCommissionPercentage);
-
-    if (commission !== null && (isNaN(commission) || commission < 0 || commission > 100)) {
-      toast({
-        title: "Invalid Commission Percentage",
-        description: "Commission must be a number between 0 and 100, or empty.",
-        variant: "destructive",
-      });
-      setIsSaving(false);
-      return;
-    }
-
+    // agentCommissionPercentage is no longer updated from this page
     const success = await updateUserProfile({
       firstName,
       lastName,
-      agentCommissionPercentage: commission,
+      // agentCommissionPercentage is removed from here
     });
 
     if (success) {
-      toast({ title: "Profile Updated", description: "Your profile details have been saved." });
+      toast({ title: "Profile Updated", description: "Your personal details have been saved." });
+    } else {
+      toast({ title: "Update Failed", description: "Could not save your profile details.", variant: "destructive" });
     }
     setIsSaving(false);
   };
@@ -92,10 +84,12 @@ const ProfilePage = () => {
               id="agentCommissionPercentage" 
               type="number"
               value={agentCommissionPercentage === null || agentCommissionPercentage === undefined ? '' : agentCommissionPercentage} 
-              onChange={(e) => setAgentCommissionPercentage(e.target.value === '' ? null : parseFloat(e.target.value))} 
-              placeholder="e.g., 10"
-              disabled={isSaving} 
+              // onChange is removed
+              placeholder="N/A"
+              disabled // Field is now disabled
+              readOnly // Field is now read-only
             />
+            <p className="text-sm text-muted-foreground mt-1">This value is managed by an administrator and cannot be changed here.</p>
           </div>
           <div>
             <Label>Accepting New Bookings</Label>
