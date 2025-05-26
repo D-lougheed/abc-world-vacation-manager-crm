@@ -184,10 +184,18 @@ const ClientDetailPage = () => {
   };
 
   const onSubmit = async (values: any) => {
+    // Define submittedDataForAudit here to make it accessible in the catch block
+    const submittedDataForAudit = {
+      first_name: values.firstName,
+      last_name: values.lastName,
+      notes: notes,
+    };
+
     try {
       setSaving(true);
       
-      const clientPayload = {
+      // This clientPayload is for the actual Supabase operation
+      const clientPayloadForSupabase = {
         first_name: values.firstName,
         last_name: values.lastName,
         notes: notes
@@ -198,7 +206,7 @@ const ClientDetailPage = () => {
       if (isNewClient) {
         result = await supabase
           .from('clients')
-          .insert(clientPayload)
+          .insert(clientPayloadForSupabase)
           .select()
           .single();
         
@@ -215,7 +223,7 @@ const ClientDetailPage = () => {
             action: 'CREATE_CLIENT',
             resourceType: 'Client',
             resourceId: newClientRecord.id,
-            details: { clientData: { ...clientPayload, id: newClientRecord.id } },
+            details: { clientData: { ...submittedDataForAudit, id: newClientRecord.id } },
           });
         }
         
@@ -228,7 +236,7 @@ const ClientDetailPage = () => {
         }
         result = await supabase
           .from('clients')
-          .update(clientPayload)
+          .update(clientPayloadForSupabase)
           .eq('id', id)
           .select()
           .single();
@@ -241,17 +249,24 @@ const ClientDetailPage = () => {
           description: "Client information has been updated successfully"
         });
         
-        if (currentUser && updatedClientRecord) {
+        if (currentUser && updatedClientRecord && client) { // ensure client (old values) exists
           await addAuditLog(currentUser, {
             action: 'UPDATE_CLIENT',
             resourceType: 'Client',
             resourceId: updatedClientRecord.id,
-            details: { oldValues: client, newValues: { ...clientPayload, id: updatedClientRecord.id, dateCreated: client.dateCreated, lastUpdated: updatedClientRecord.last_updated } },
+            details: { 
+              oldValues: { 
+                first_name: client.firstName, 
+                last_name: client.lastName, 
+                notes: client.notes 
+              }, 
+              newValues: { ...submittedDataForAudit, id: updatedClientRecord.id, dateCreated: client.dateCreated, last_updated: updatedClientRecord.last_updated } 
+            },
           });
         }
         
         setEditMode(false);
-        fetchClientData(id);
+        fetchClientData(id); // Refetch data to update the view and client state
       }
     } catch (error: any) {
       console.error('Error saving client:', error);
@@ -265,7 +280,7 @@ const ClientDetailPage = () => {
           action: isNewClient ? 'CREATE_CLIENT_FAILED' : 'UPDATE_CLIENT_FAILED',
           resourceType: 'Client',
           resourceId: id || null,
-          details: { error: error.message, submittedData: clientPayload },
+          details: { error: error.message, submittedData: submittedDataForAudit },
         });
       }
     } finally {
