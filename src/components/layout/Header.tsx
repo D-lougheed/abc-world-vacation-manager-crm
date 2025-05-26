@@ -1,5 +1,5 @@
+
 import { 
-  Search, 
   Bell, 
   User,
   LogOut,
@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input"; // Input is no longer needed
+// import { Search } from "lucide-react"; // Search icon is no longer needed
 import { Link } from "react-router-dom";
 
 const Header = () => {
@@ -31,10 +32,7 @@ const Header = () => {
         <Button variant="ghost" size="icon" onClick={toggleSidebar} className="mr-4">
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="relative w-64 lg:w-96">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search..." className="pl-8" />
-        </div>
+        {/* Search bar removed from here */}
       </div>
       
       <div className="flex items-center gap-4">
