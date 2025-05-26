@@ -26,7 +26,8 @@ import AgentsPage from "./pages/AgentsPage";
 import AddAgentPage from "./pages/AddAgentPage";
 import ServiceTypesPage from "./pages/ServiceTypesPage";
 import TagsPage from "./pages/TagsPage";
-import BatchEditTagsPage from "./pages/BatchEditTagsPage"; // Import the new page
+import BatchEditTagsPage from "./pages/BatchEditTagsPage";
+import SystemSettingsPage from "./pages/SystemSettingsPage"; // Import the new SystemSettingsPage
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -90,7 +91,8 @@ const App = () => (
               <Route path="/admin/agents/new" element={<AddAgentPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
-              <Route path="/admin/tags/batch-edit" element={<BatchEditTagsPage />} /> {/* New Route for Batch Edit Tags */}
+              <Route path="/admin/tags/batch-edit" element={<BatchEditTagsPage />} />
+              <Route path="/admin/system-settings" element={<SystemSettingsPage />} /> {/* New Route for System Settings */}
               <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} />
 
               {/* Mass Import Routes */}

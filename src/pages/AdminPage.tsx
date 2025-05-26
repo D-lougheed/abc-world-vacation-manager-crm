@@ -125,7 +125,7 @@ const AdminPage = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/system-settings")}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center">
                 <Settings className="mr-2 h-5 w-5 text-primary" />
@@ -135,10 +135,10 @@ const AdminPage = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Configure global settings, default values, and system behaviors.
+                Configure global settings, default values, and system behaviors. E.g., default commission rate.
               </p>
               <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
-                <span>System Configuration</span>
+                <span>Configure Settings</span>
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>
