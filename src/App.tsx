@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,7 +26,7 @@ import AddAgentPage from "./pages/AddAgentPage";
 import ServiceTypesPage from "./pages/ServiceTypesPage";
 import TagsPage from "./pages/TagsPage";
 import BatchEditTagsPage from "./pages/BatchEditTagsPage";
-import SystemSettingsPage from "./pages/SystemSettingsPage"; // Import the new SystemSettingsPage
+import SystemSettingsPage from "./pages/SystemSettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -41,6 +40,10 @@ import TagImportPage from "./pages/TagImportPage";
 
 // Import Audit Log Page
 import AdminAuditLogPage from "./pages/AdminAuditLogPage";
+
+// Import new pages
+import ProfilePage from "./pages/ProfilePage";
+import UserSettingsPage from "./pages/UserSettingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +76,8 @@ const App = () => (
               }
             >
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<UserSettingsPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/clients/:id" element={<ClientDetailPage />} />
               <Route path="/vendors" element={<VendorsPage />} />
@@ -92,7 +97,7 @@ const App = () => (
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
               <Route path="/admin/tags/batch-edit" element={<BatchEditTagsPage />} />
-              <Route path="/admin/system-settings" element={<SystemSettingsPage />} /> {/* New Route for System Settings */}
+              <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
               <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} />
 
               {/* Mass Import Routes */}

@@ -326,6 +326,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accepting_new_bookings: boolean
+          agent_commission_percentage: number | null
           created_at: string
           email: string
           first_name: string
@@ -336,6 +338,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepting_new_bookings?: boolean
+          agent_commission_percentage?: number | null
           created_at?: string
           email: string
           first_name: string
@@ -346,6 +350,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepting_new_bookings?: boolean
+          agent_commission_percentage?: number | null
           created_at?: string
           email?: string
           first_name?: string

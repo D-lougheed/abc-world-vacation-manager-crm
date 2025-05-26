@@ -1,4 +1,3 @@
-
 export enum UserRole {
   SuperAdmin = "SuperAdmin",
   Admin = "Admin",
@@ -9,9 +8,11 @@ export interface User {
   id: string;
   email: string;
   firstName: string;
-  lastName: string;
+  lastName:string;
   role: UserRole;
   isActive: boolean;
+  agentCommissionPercentage?: number | null; // Added
+  acceptingNewBookings?: boolean; // Added
 }
 
 export interface Client {
