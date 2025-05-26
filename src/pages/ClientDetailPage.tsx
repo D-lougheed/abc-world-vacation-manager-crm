@@ -38,6 +38,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useAuth } from "@/contexts/AuthContext";
+import { addAuditLog } from "@/services/AuditLogService";
 
 const ClientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -49,10 +51,11 @@ const ClientDetailPage = () => {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(isNewClient); // Edit mode enabled by default for new clients
   const [notes, setNotes] = useState("");
-  const [client, setClient] = useState<any>(null);
+  const [client, setClient] = useState<any>(null); // This stores the original client data for comparison on update
   const [trips, setTrips] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const { user: currentUser } = useAuth();
 
   const form = useForm({
     defaultValues: {
@@ -63,12 +66,12 @@ const ClientDetailPage = () => {
 
   // Fetch client data if this is not a new client
   useEffect(() => {
-    if (!isNewClient) {
-      fetchClientData();
+    if (!isNewClient && id) {
+      fetchClientData(id);
     }
-  }, [id]);
+  }, [id, isNewClient]);
 
-  const fetchClientData = async () => {
+  const fetchClientData = async (clientId: string) => {
     try {
       setLoading(true);
       
@@ -76,19 +79,20 @@ const ClientDetailPage = () => {
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
-        .eq('id', id)
+        .eq('id', clientId)
         .single();
       
       if (clientError) throw clientError;
       
-      setClient({
+      const fetchedClient = {
         id: clientData.id,
         firstName: clientData.first_name,
         lastName: clientData.last_name,
         dateCreated: clientData.date_created,
         lastUpdated: clientData.last_updated,
         notes: clientData.notes || "",
-      });
+      };
+      setClient(fetchedClient);
       
       form.reset({
         firstName: clientData.first_name,
@@ -110,7 +114,7 @@ const ClientDetailPage = () => {
             status
           )
         `)
-        .eq('client_id', id);
+        .eq('client_id', clientId);
       
       if (tripsError) throw tripsError;
       
@@ -135,7 +139,7 @@ const ClientDetailPage = () => {
             )
           )
         `)
-        .eq('client_id', id);
+        .eq('client_id', clientId);
       
       if (bookingsError) throw bookingsError;
       
@@ -156,7 +160,7 @@ const ClientDetailPage = () => {
       const { data: documentsData, error: documentsError } = await supabase
         .from('client_documents')
         .select('*')
-        .eq('client_id', id);
+        .eq('client_id', clientId);
       
       if (documentsError) throw documentsError;
       
@@ -183,7 +187,7 @@ const ClientDetailPage = () => {
     try {
       setSaving(true);
       
-      const clientData = {
+      const clientPayload = {
         first_name: values.firstName,
         last_name: values.lastName,
         notes: notes
@@ -192,39 +196,62 @@ const ClientDetailPage = () => {
       let result;
       
       if (isNewClient) {
-        // Create new client
         result = await supabase
           .from('clients')
-          .insert(clientData)
-          .select();
+          .insert(clientPayload)
+          .select()
+          .single();
         
         if (result.error) throw result.error;
         
+        const newClientRecord = result.data;
         toast({
           title: "Client created",
           description: "New client has been created successfully"
         });
         
-        // Redirect to the new client's page
-        navigate(`/clients/${result.data[0].id}`);
+        if (currentUser && newClientRecord) {
+          await addAuditLog(currentUser, {
+            action: 'CREATE_CLIENT',
+            resourceType: 'Client',
+            resourceId: newClientRecord.id,
+            details: { clientData: { ...clientPayload, id: newClientRecord.id } },
+          });
+        }
+        
+        navigate(`/clients/${newClientRecord.id}`);
       } else {
-        // Update existing client
+        if (!id) {
+          toast({ title: "Error", description: "Client ID is missing for update.", variant: "destructive" });
+          setSaving(false);
+          return;
+        }
         result = await supabase
           .from('clients')
-          .update(clientData)
+          .update(clientPayload)
           .eq('id', id)
-          .select();
+          .select()
+          .single();
         
         if (result.error) throw result.error;
         
+        const updatedClientRecord = result.data;
         toast({
           title: "Client updated",
           description: "Client information has been updated successfully"
         });
         
-        // Exit edit mode and refresh client data
+        if (currentUser && updatedClientRecord) {
+          await addAuditLog(currentUser, {
+            action: 'UPDATE_CLIENT',
+            resourceType: 'Client',
+            resourceId: updatedClientRecord.id,
+            details: { oldValues: client, newValues: { ...clientPayload, id: updatedClientRecord.id, dateCreated: client.dateCreated, lastUpdated: updatedClientRecord.last_updated } },
+          });
+        }
+        
         setEditMode(false);
-        fetchClientData();
+        fetchClientData(id);
       }
     } catch (error: any) {
       console.error('Error saving client:', error);
@@ -233,6 +260,14 @@ const ClientDetailPage = () => {
         description: error.message || "There was an error saving client data",
         variant: "destructive"
       });
+      if (currentUser) {
+        await addAuditLog(currentUser, {
+          action: isNewClient ? 'CREATE_CLIENT_FAILED' : 'UPDATE_CLIENT_FAILED',
+          resourceType: 'Client',
+          resourceId: id || null,
+          details: { error: error.message, submittedData: clientPayload },
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -240,7 +275,6 @@ const ClientDetailPage = () => {
 
   const handleCancelEdit = () => {
     if (!isNewClient) {
-      // Reset form to current client values
       form.reset({
         firstName: client?.firstName,
         lastName: client?.lastName,
@@ -248,12 +282,11 @@ const ClientDetailPage = () => {
       setNotes(client?.notes || "");
       setEditMode(false);
     } else {
-      // Navigate back to clients list
       navigate('/clients');
     }
   };
 
-  if (loading) {
+  if (loading && !isNewClient) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -277,7 +310,7 @@ const ClientDetailPage = () => {
           ) : (
             <div>
               <h1 className="text-3xl font-bold">{client?.firstName} {client?.lastName}</h1>
-              <p className="text-sm text-muted-foreground">Client since {new Date(client?.dateCreated).toLocaleDateString()}</p>
+              <p className="text-sm text-muted-foreground">Client since {client?.dateCreated ? new Date(client.dateCreated).toLocaleDateString() : 'N/A'}</p>
             </div>
           )}
         </div>
@@ -289,7 +322,7 @@ const ClientDetailPage = () => {
               Edit Client
             </Button>
           )}
-          {!isNewClient && (
+          {!isNewClient && id && (
             <>
               <Button variant="outline" onClick={() => navigate(`/trips/new?clientId=${id}`)}>
                 <CalendarCheck className="mr-2 h-4 w-4" />
@@ -316,6 +349,7 @@ const ClientDetailPage = () => {
                   <FormField
                     control={form.control}
                     name="firstName"
+                    rules={{ required: "First name is required" }}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
@@ -330,6 +364,7 @@ const ClientDetailPage = () => {
                   <FormField
                     control={form.control}
                     name="lastName"
+                    rules={{ required: "Last name is required" }}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
@@ -341,22 +376,23 @@ const ClientDetailPage = () => {
                     )}
                   />
                   
-                  {!isNewClient && (
+                  {!isNewClient && client && (
                     <>
                       <div>
                         <Label className="text-sm font-medium text-muted-foreground">Client Since</Label>
-                        <div>{new Date(client?.dateCreated).toLocaleDateString()}</div>
+                        <div>{new Date(client.dateCreated).toLocaleDateString()}</div>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-                        <div>{new Date(client?.lastUpdated).toLocaleDateString()}</div>
+                        <div>{new Date(client.lastUpdated).toLocaleDateString()}</div>
                       </div>
                     </>
                   )}
                   
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                    <Label htmlFor="client-notes" className="text-sm font-medium text-muted-foreground">Notes</Label>
                     <Textarea
+                      id="client-notes"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       className="min-h-[100px] mt-1"
@@ -364,12 +400,12 @@ const ClientDetailPage = () => {
                     />
                   </div>
                   
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1" disabled={saving}>
+                  <div className="flex gap-2 pt-2">
+                    <Button type="submit" className="flex-1" disabled={saving || !form.formState.isValid}>
                       {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {isNewClient ? "Create Client" : "Save Changes"}
                     </Button>
-                    <Button type="button" variant="outline" onClick={handleCancelEdit} className="flex-1">
+                    <Button type="button" variant="outline" onClick={handleCancelEdit} className="flex-1" disabled={saving}>
                       <X className="mr-2 h-4 w-4" />
                       Cancel
                     </Button>
@@ -377,31 +413,33 @@ const ClientDetailPage = () => {
                 </form>
               </Form>
             ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">First Name</Label>
-                  <p className="mt-1">{client?.firstName}</p>
+              client && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">First Name</Label>
+                    <p className="mt-1">{client.firstName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Last Name</Label>
+                    <p className="mt-1">{client.lastName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Client Since</Label>
+                    <p className="mt-1">{new Date(client.dateCreated).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Last Updated</Label>
+                    <p className="mt-1">{new Date(client.lastUpdated).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Notes</Label>
+                    <p className="mt-1 whitespace-pre-wrap">{client.notes || "No notes available."}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">Last Name</Label>
-                  <p className="mt-1">{client?.lastName}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Client Since</Label>
-                  <p className="mt-1">{new Date(client?.dateCreated).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Last Updated</Label>
-                  <p className="mt-1">{new Date(client?.lastUpdated).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Notes</Label>
-                  <p className="mt-1 whitespace-pre-wrap">{client?.notes || "No notes available."}</p>
-                </div>
-              </div>
+              )
             )}
             
-            {!isNewClient && !editMode && (
+            {!isNewClient && !editMode && client && (
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-muted-foreground">Documents</span>
@@ -434,7 +472,7 @@ const ClientDetailPage = () => {
           </CardContent>
         </Card>
         
-        {!isNewClient && (
+        {!isNewClient && client && (
           <Card className="col-span-3 md:col-span-2">
             <Tabs defaultValue="trips">
               <CardHeader className="pb-0">
@@ -443,11 +481,11 @@ const ClientDetailPage = () => {
                   <TabsList>
                     <TabsTrigger value="trips">
                       <Calendar className="mr-2 h-4 w-4" />
-                      Trips
+                      Trips ({trips.length})
                     </TabsTrigger>
                     <TabsTrigger value="bookings">
                       <Clock className="mr-2 h-4 w-4" />
-                      Bookings
+                      Bookings ({bookings.length})
                     </TabsTrigger>
                   </TabsList>
                 </div>
