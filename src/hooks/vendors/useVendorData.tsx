@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +58,8 @@ interface UseVendorDataReturn {
   vendorRating: number;
 }
 
+const DEFAULT_VENDOR_COMMISSION_KEY = "default_vendor_commission_percentage";
+
 export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean): UseVendorDataReturn => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -69,7 +70,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
     phone: "",
     address: "",
     serviceArea: "Local",
-    commissionRate: 10,
+    commissionRate: 10, // Default fallback if system setting is not found
     priceRange: 3,
     notes: ""
   });
@@ -103,6 +104,35 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
         
         if (tagsError) throw tagsError;
         setAvailableTags(tagsData || []);
+
+        let initialCommissionRate = 10; // Default fallback
+
+        if (isNewVendor) {
+          // Fetch default commission for new vendors
+          try {
+            const { data: commissionSetting, error: commissionError } = await supabase
+              .from("system_settings")
+              .select("value")
+              .eq("key", DEFAULT_VENDOR_COMMISSION_KEY)
+              .maybeSingle();
+
+            if (commissionError) {
+              console.warn("Could not fetch default vendor commission setting:", commissionError.message);
+            } else if (commissionSetting && commissionSetting.value) {
+              const parsedCommission = parseFloat(commissionSetting.value);
+              if (!isNaN(parsedCommission)) {
+                initialCommissionRate = parsedCommission;
+              }
+            }
+          } catch (error: any) {
+            console.warn("Error fetching default vendor commission:", error.message);
+          }
+          
+          setFormData(prev => ({
+            ...prev,
+            commissionRate: initialCommissionRate,
+          }));
+        }
         
         // For existing vendor, fetch vendor data
         if (!isNewVendor && vendorId) {
@@ -123,7 +153,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
               phone: vendorData.phone,
               address: vendorData.address,
               serviceArea: vendorData.service_area,
-              commissionRate: vendorData.commission_rate,
+              commissionRate: vendorData.commission_rate, // This will override the default if an existing vendor
               priceRange: vendorData.price_range,
               notes: vendorData.notes || ""
             });

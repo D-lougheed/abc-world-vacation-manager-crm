@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { UserRole } from "@/types";
 
-const DEFAULT_COMMISSION_KEY = "default_commission_percentage";
+const DEFAULT_VENDOR_COMMISSION_KEY = "default_vendor_commission_percentage"; // Renamed key
 
 const SystemSettingsPage = () => {
   const [defaultCommission, setDefaultCommission] = useState("");
@@ -27,7 +27,7 @@ const SystemSettingsPage = () => {
       const { data, error } = await supabase
         .from("system_settings")
         .select("value")
-        .eq("key", DEFAULT_COMMISSION_KEY)
+        .eq("key", DEFAULT_VENDOR_COMMISSION_KEY) // Use updated key
         .maybeSingle();
 
       if (error) throw error;
@@ -72,13 +72,13 @@ const SystemSettingsPage = () => {
     try {
       const { error } = await supabase
         .from("system_settings")
-        .upsert({ key: DEFAULT_COMMISSION_KEY, value: defaultCommission }, { onConflict: 'key' });
+        .upsert({ key: DEFAULT_VENDOR_COMMISSION_KEY, value: defaultCommission }, { onConflict: 'key' }); // Use updated key
 
       if (error) throw error;
 
       toast({
         title: "Settings saved successfully",
-        description: "Default commission percentage has been updated.",
+        description: "Default vendor commission percentage has been updated.",
       });
       setInitialCommission(defaultCommission); // Update initial value to prevent "unsaved changes"
     } catch (error: any) {
@@ -108,17 +108,17 @@ const SystemSettingsPage = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Default Commission</CardTitle>
-            <CardDescription>Set the default commission percentage for new bookings.</CardDescription>
+            <CardTitle>Default Vendor Commission</CardTitle> {/* Updated Title */}
+            <CardDescription>Set the default commission percentage for new vendors.</CardDescription> {/* Updated Description */}
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
               <p>Loading settings...</p>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="defaultCommission">Default Commission Percentage (%)</Label>
+                <Label htmlFor="defaultVendorCommission">Default Vendor Commission Percentage (%)</Label> {/* Updated Label */}
                 <Input
-                  id="defaultCommission"
+                  id="defaultVendorCommission" // Updated id
                   type="number"
                   value={defaultCommission}
                   onChange={(e) => setDefaultCommission(e.target.value)}
