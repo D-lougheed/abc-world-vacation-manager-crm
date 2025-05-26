@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,7 @@ const TripDetailPage = () => {
     name: "",
     startDate: "",
     endDate: "",
-    status: "Planned",
+    status: "Planned" as TripStatus, // Explicitly cast to TripStatus
     highPriority: false,
     description: "",
     notes: "",
@@ -106,7 +105,7 @@ const TripDetailPage = () => {
         if (error) throw error;
         
         setAvailableAgents(data.map(agent => ({
-          value: agent.id,
+          value: agent.value, // Ensure this matches the expected structure if it's different
           label: `${agent.first_name} ${agent.last_name}`
         })));
       } catch (error: any) {
@@ -137,7 +136,7 @@ const TripDetailPage = () => {
         name: "",
         startDate: "",
         endDate: "",
-        status: "Planned",
+        status: TripStatus.Planned, // Use enum value
         highPriority: false,
         description: "",
         notes: "",
@@ -148,13 +147,15 @@ const TripDetailPage = () => {
       return;
     }
     
+    // If it's not a new trip (i.e., id is a specific trip ID)
+    setIsNewTrip(false); // Ensure isNewTrip is false for existing/newly created trips
     fetchTripData();
-  }, [id, user]);
+  }, [id, user]); // Added user to dependencies as it's used in agentId for new trips
 
   const fetchTripData = async () => {
     try {
-      if (id === "new") {
-        return; // Skip fetching for new trips
+      if (id === "new" || !id) { // Added !id check for safety
+        return; // Skip fetching for new trips or if id is undefined
       }
       
       setLoading(true);
@@ -167,12 +168,24 @@ const TripDetailPage = () => {
         .single();
       
       if (tripError) {
+        // If trip not found, it could be a new trip that was just created
+        // but something went wrong with redirect or state update.
+        // Or simply a non-existent trip ID.
+        if (tripError.code === 'PGRST116') { // PostgREST error for "JSON object requested, multiple (or no) rows returned"
+          console.warn(`Trip with ID ${id} not found. It might be a new trip or an invalid ID.`);
+          toast({
+            title: "Trip not found",
+            description: `Could not find a trip with ID ${id}.`,
+            variant: "destructive"
+          });
+          navigate("/trips"); // Navigate to a safe page
+          return;
+        }
         throw tripError;
       }
       
       setTrip(tripData);
       
-      // Fetch agent name if agent_id exists
       if (tripData.agent_id) {
         const { data: agentData, error: agentError } = await supabase
           .from("profiles")
@@ -182,10 +195,13 @@ const TripDetailPage = () => {
           
         if (!agentError && agentData) {
           setAgentName(`${agentData.first_name} ${agentData.last_name}`);
+        } else if (agentError) {
+          console.warn("Error fetching agent name for trip:", agentError.message);
         }
+      } else {
+        setAgentName("Unassigned");
       }
       
-      // Fetch client data
       const { data: tripClientData, error: tripClientError } = await supabase
         .from("trip_clients")
         .select("client_id")
@@ -197,7 +213,7 @@ const TripDetailPage = () => {
       
       const clientIds: string[] = tripClientData?.map(tc => tc.client_id) || [];
 
-      if (tripClientData && tripClientData.length > 0) {
+      if (clientIds.length > 0) {
         const { data: clientsData, error: clientsError } = await supabase
           .from("clients")
           .select("*")
@@ -208,13 +224,15 @@ const TripDetailPage = () => {
         }
         
         setClients(clientsData || []);
+      } else {
+        setClients([]); // Ensure clients is an empty array if no clients
       }
 
       setFormData({
         name: tripData.name,
         startDate: tripData.start_date,
         endDate: tripData.end_date,
-        status: tripData.status,
+        status: tripData.status as TripStatus,
         highPriority: tripData.high_priority,
         description: tripData.description || "",
         notes: tripData.notes || "",
@@ -253,37 +271,55 @@ const TripDetailPage = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
-    setFormData({
-      ...formData,
+    setFormData(prevFormData => ({ // Use functional update for safety
+      ...prevFormData,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value
-    });
+    }));
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
+    setFormData(prevFormData => ({ // Use functional update
+      ...prevFormData,
       [e.target.name]: e.target.checked
-    });
+    }));
   };
 
   const handleClientChange = (selectedClients: string[]) => {
-    setFormData({
-      ...formData,
+    setFormData(prevFormData => ({ // Use functional update
+      ...prevFormData,
       clients: selectedClients
-    });
+    }));
   };
 
   const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
+    setFormData(prevFormData => ({ // Use functional update
+      ...prevFormData,
       agentId: e.target.value
-    });
+    }));
   };
 
   const handleSaveTrip = async () => {
     try {
       setSaving(true);
       
+      // Validate dates
+      if (!formData.startDate || !formData.endDate) {
+        toast({ title: "Validation Error", description: "Start date and end date are required.", variant: "destructive"});
+        setSaving(false);
+        return;
+      }
+      if (new Date(formData.endDate) < new Date(formData.startDate)) {
+        toast({ title: "Validation Error", description: "End date cannot be before start date.", variant: "destructive"});
+        setSaving(false);
+        return;
+      }
+      if (!formData.name.trim()) {
+        toast({ title: "Validation Error", description: "Trip name is required.", variant: "destructive"});
+        setSaving(false);
+        return;
+      }
+
+
       const tripData = {
         name: formData.name,
         start_date: formData.startDate,
@@ -292,13 +328,12 @@ const TripDetailPage = () => {
         high_priority: formData.highPriority,
         description: formData.description,
         notes: formData.notes,
-        agent_id: formData.agentId || user?.id
+        agent_id: formData.agentId || user?.id // Default to current user if no agent selected/available
       };
       
-      let tripId = id;
+      let currentTripId = id; // Use a local variable for tripId within this function
       
       if (isNewTrip) {
-        // Create a new trip
         const { data, error } = await supabase
           .from("trips")
           .insert(tripData)
@@ -306,12 +341,11 @@ const TripDetailPage = () => {
           .single();
         
         if (error) throw error;
-        tripId = data.id;
+        currentTripId = data.id; // Assign the new trip's ID
 
-        // Save client associations for new trip
         if (formData.clients.length > 0) {
           const clientAssociations = formData.clients.map(clientId => ({
-            trip_id: tripId,
+            trip_id: currentTripId,
             client_id: clientId
           }));
 
@@ -327,29 +361,28 @@ const TripDetailPage = () => {
           description: "Trip created successfully!"
         });
         
-        // Redirect to the new trip's page
-        navigate(`/trips/${tripId}`, { replace: true });
+        navigate(`/trips/${currentTripId}`, { replace: true });
+        // No need to call fetchTripData here, the useEffect for [id, user] will handle it
+        // and setIsNewTrip(false) will be called by that useEffect.
       } else {
         // Update existing trip
         const { error } = await supabase
           .from("trips")
           .update(tripData)
-          .eq("id", id);
+          .eq("id", currentTripId); // Use currentTripId (which is `id` for existing trips)
         
         if (error) throw error;
         
-        // First, delete existing client associations
         const { error: deleteError } = await supabase
           .from("trip_clients")
           .delete()
-          .eq("trip_id", id);
+          .eq("trip_id", currentTripId);
           
         if (deleteError) throw deleteError;
         
-        // Then add new client associations
         if (formData.clients.length > 0) {
           const clientAssociations = formData.clients.map(clientId => ({
-            trip_id: id,
+            trip_id: currentTripId,
             client_id: clientId
           }));
           
@@ -360,19 +393,18 @@ const TripDetailPage = () => {
           if (insertError) throw insertError;
         }
         
-        // Update the trip state
-        setTrip({
-          ...trip,
-          ...tripData
-        });
+        setTrip((prevTrip: any) => ({ // Ensure setTrip uses functional update if based on prev state
+          ...prevTrip, 
+          ...tripData,
+          id: currentTripId // Ensure id is part of the updated trip state
+        }));
         
         toast({
           title: "Success",
           description: "Trip updated successfully!"
         });
         
-        // Refresh data
-        fetchTripData();
+        fetchTripData(); // Refresh data for the current trip
       }
     } catch (error: any) {
       console.error("Error saving trip:", error);
@@ -402,7 +434,7 @@ const TripDetailPage = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !isNewTrip) { // Only show main loader if not on new trip form already
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-2">
@@ -451,10 +483,9 @@ const TripDetailPage = () => {
                     value={formData.status}
                     onChange={handleInputChange}
                   >
-                    <option value="Planned">Planned</option>
-                    <option value="Ongoing">Ongoing</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Canceled">Canceled</option>
+                    {Object.values(TripStatus).map(statusVal => (
+                      <option key={statusVal} value={statusVal}>{statusVal}</option>
+                    ))}
                   </select>
                 </div>
                 
@@ -497,13 +528,36 @@ const TripDetailPage = () => {
                   </label>
                 </div>
 
-                {/* Agent field (read-only for non-admin users) */}
                 <div className="space-y-2">
                   <label htmlFor="agentId" className="text-sm font-medium">Assigned Agent</label>
-                  <div className="flex items-center p-2 bg-gray-50 border rounded-md">
-                    <UserCircle className="h-4 w-4 text-muted-foreground mr-2" />
-                    <span>{user?.firstName} {user?.lastName} (You)</span>
-                  </div>
+                  <RoleBasedComponent requiredRole={UserRole.Admin} fallback={
+                      <div className="flex items-center p-2 bg-gray-50 border rounded-md">
+                        <UserCircle className="h-4 w-4 text-muted-foreground mr-2" />
+                        <span>{user?.firstName} {user?.lastName} (You)</span>
+                      </div>
+                    }>
+                      <select
+                        id="agentId"
+                        name="agentId"
+                        className="w-full p-2 border rounded-md"
+                        value={formData.agentId || user?.id || ""} // Ensure a value is always set
+                        onChange={handleAgentChange}
+                        disabled={agentsLoading}
+                      >
+                        <option value="">Select an agent</option>
+                        {/* Current user as an option if they are an agent/admin */}
+                        {user && (user.role === UserRole.Agent || user.role === UserRole.Admin || user.role === UserRole.SuperAdmin) && (
+                          <option value={user.id}>{user.firstName} {user.lastName} (You)</option>
+                        )}
+                        {/* Other available agents */}
+                        {availableAgents.filter(agent => agent.value !== user?.id).map((agent) => (
+                          <option key={agent.value} value={agent.value}>
+                            {agent.label}
+                          </option>
+                        ))}
+                      </select>
+                       {agentsLoading && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
+                    </RoleBasedComponent>
                 </div>
               </div>
               
@@ -549,7 +603,7 @@ const TripDetailPage = () => {
                 <Button
                   type="button"
                   onClick={handleSaveTrip}
-                  disabled={saving}
+                  disabled={saving || loading} // Disable if main loading is also happening
                 >
                   {saving ? (
                     <>
@@ -570,6 +624,16 @@ const TripDetailPage = () => {
       </div>
     );
   }
+  
+  // Fallback if trip data is somehow null after loading and not a new trip
+  if (!trip) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p>Trip data not available. Please try again or contact support.</p>
+      </div>
+    );
+  }
+
 
   // For existing trip, show the details page
   return (
@@ -597,7 +661,7 @@ const TripDetailPage = () => {
       </div>
       
       <div className="flex items-center gap-2">
-        <Badge className={getStatusBadgeStyle(trip.status)}>
+        <Badge className={getStatusBadgeStyle(trip.status as TripStatus)}>
           {trip.status}
         </Badge>
       </div>
@@ -631,7 +695,7 @@ const TripDetailPage = () => {
                       <CalendarClock className="h-4 w-4 text-muted-foreground" />
                       <span>
                         <span className="font-medium">Duration: </span>
-                        {Math.ceil((new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / (1000 * 60 * 60 * 24))} days
+                        {Math.max(1, Math.ceil((new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / (1000 * 60 * 60 * 24)) +1 )} days
                       </span>
                     </div>
                     {trip.high_priority && (
@@ -708,7 +772,7 @@ const TripDetailPage = () => {
                       <div className="flex flex-col cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/bookings/${booking.id}`)}>
                         <div className="px-6 py-4">
                           <div className="flex items-center justify-between">
-                            <h3 className="font-medium">{booking.vendor.name}</h3>
+                            <h3 className="font-medium">{booking.vendor?.name || "Unknown Vendor"}</h3>
                             <Badge variant={booking.booking_status === "Confirmed" ? "default" : "outline"}>
                               {booking.booking_status}
                             </Badge>
@@ -778,10 +842,9 @@ const TripDetailPage = () => {
                       value={formData.status}
                       onChange={handleInputChange}
                     >
-                      <option value="Planned">Planned</option>
-                      <option value="Ongoing">Ongoing</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Canceled">Canceled</option>
+                      {Object.values(TripStatus).map(statusVal => (
+                        <option key={statusVal} value={statusVal}>{statusVal}</option>
+                      ))}
                     </select>
                   </div>
                   
@@ -824,7 +887,6 @@ const TripDetailPage = () => {
                     </label>
                   </div>
                   
-                  {/* Agent field (editable only for admin users) */}
                   <div className="space-y-2">
                     <label htmlFor="agentId" className="text-sm font-medium">Assigned Agent</label>
                     <RoleBasedComponent requiredRole={UserRole.Admin} fallback={
@@ -839,6 +901,7 @@ const TripDetailPage = () => {
                         className="w-full p-2 border rounded-md"
                         value={formData.agentId}
                         onChange={handleAgentChange}
+                        disabled={agentsLoading}
                       >
                         <option value="">Select an agent</option>
                         {availableAgents.map((agent) => (
@@ -847,6 +910,7 @@ const TripDetailPage = () => {
                           </option>
                         ))}
                       </select>
+                      {agentsLoading && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
                     </RoleBasedComponent>
                   </div>
                 </div>
