@@ -1,8 +1,9 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { addAuditLog } from "@/services/AuditLogService";
 
 interface VendorFormData {
   name: string;
@@ -37,8 +38,17 @@ export const useVendorActions = (
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const { user: currentUser } = useAuth();
 
   const handleSaveVendor = async () => {
+    // Define submittedDataForAudit to make it accessible in the catch block
+    const submittedDataForAudit = {
+      name: formData.name,
+      contactPerson: formData.contactPerson,
+      email: formData.email,
+      // Add other relevant fields from formData as needed
+    };
+
     try {
       setSaving(true);
       
@@ -92,6 +102,15 @@ export const useVendorActions = (
           title: "Vendor created",
           description: `${formData.name} has been added to your vendors`,
         });
+
+        if (currentUser && finalVendorId) {
+          await addAuditLog(currentUser, {
+            action: 'CREATE_VENDOR',
+            resourceType: 'Vendor',
+            resourceId: finalVendorId,
+            details: { vendorData: submittedDataForAudit },
+          });
+        }
         
         // Navigate to the new vendor's page in view mode
         navigate(`/vendors/${finalVendorId}`);
@@ -115,6 +134,18 @@ export const useVendorActions = (
           title: "Vendor updated",
           description: "Vendor information has been successfully updated",
         });
+
+        if (currentUser && vendorId) {
+          // For updates, "oldValues" are not readily available in this hook.
+          // We log the new values. For more detailed old/new comparison,
+          // the component using this hook would need to fetch and pass old data.
+          await addAuditLog(currentUser, {
+            action: 'UPDATE_VENDOR',
+            resourceType: 'Vendor',
+            resourceId: vendorId,
+            details: { newValues: submittedDataForAudit },
+          });
+        }
       }
     } catch (error: any) {
       console.error('Error saving vendor:', error);
@@ -123,6 +154,14 @@ export const useVendorActions = (
         description: error.message,
         variant: "destructive"
       });
+      if (currentUser) {
+        await addAuditLog(currentUser, {
+          action: isNewVendor ? 'CREATE_VENDOR_FAILED' : 'UPDATE_VENDOR_FAILED',
+          resourceType: 'Vendor',
+          resourceId: vendorId || null, // vendorId might be undefined for new vendor creation failure before ID generation
+          details: { error: error.message, submittedData: submittedDataForAudit },
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -217,6 +256,11 @@ export const useVendorActions = (
   };
 
   const handleDeleteVendor = async () => {
+    // Attempt to get vendor name for audit log before deletion, if possible.
+    // This might require an extra fetch if formData isn't guaranteed to be the current vendor's data.
+    // For simplicity, we'll use formData.name if available, otherwise just the ID.
+    const vendorNameToLog = formData?.name || `ID: ${vendorId}`;
+
     try {
       setSaving(true);
       
@@ -234,6 +278,15 @@ export const useVendorActions = (
         title: "Vendor deleted",
         description: "The vendor has been successfully removed"
       });
+
+      if (currentUser && vendorId) {
+        await addAuditLog(currentUser, {
+          action: 'DELETE_VENDOR',
+          resourceType: 'Vendor',
+          resourceId: vendorId,
+          details: { vendorName: vendorNameToLog }, // Log name if available
+        });
+      }
       
       navigate('/vendors');
     } catch (error: any) {
@@ -243,6 +296,14 @@ export const useVendorActions = (
         description: error.message,
         variant: "destructive"
       });
+      if (currentUser && vendorId) {
+        await addAuditLog(currentUser, {
+          action: 'DELETE_VENDOR_FAILED',
+          resourceType: 'Vendor',
+          resourceId: vendorId,
+          details: { error: error.message, vendorName: vendorNameToLog },
+        });
+      }
     } finally {
       setSaving(false);
       setDeleteDialogOpen(false);
