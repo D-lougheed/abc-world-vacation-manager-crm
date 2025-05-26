@@ -105,7 +105,7 @@ const TripDetailPage = () => {
         if (error) throw error;
         
         setAvailableAgents(data.map(agent => ({
-          value: agent.value, // Ensure this matches the expected structure if it's different
+          value: agent.id, // Changed agent.value to agent.id
           label: `${agent.first_name} ${agent.last_name}`
         })));
       } catch (error: any) {
