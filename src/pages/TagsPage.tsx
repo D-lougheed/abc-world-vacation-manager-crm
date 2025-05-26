@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   Tags,
@@ -86,7 +87,8 @@ const TagsPage = () => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
+  const navigate = useNavigate();
+
   // Initialize form
   const form = useForm<TagFormValues>({
     resolver: zodResolver(tagFormSchema),
@@ -125,9 +127,25 @@ const TagsPage = () => {
           .eq('tag_id', tag.id);
         
         if (vendorTagsError) throw vendorTagsError;
+
+        // Count booking_tags usage
+        const { count: bookingTagsCount, error: bookingTagsError } = await supabase
+          .from('booking_tags')
+          .select('tag_id', { count: 'exact', head: true })
+          .eq('tag_id', tag.id);
+
+        if (bookingTagsError) throw bookingTagsError;
+
+        // Count trip_tags usage
+        const { count: tripTagsCount, error: tripTagsError } = await supabase
+          .from('trip_tags')
+          .select('tag_id', { count: 'exact', head: true })
+          .eq('tag_id', tag.id);
+        
+        if (tripTagsError) throw tripTagsError;
         
         // Total usage count
-        const usageCount = (serviceTypeTagsCount || 0) + (vendorTagsCount || 0);
+        const usageCount = (serviceTypeTagsCount || 0) + (vendorTagsCount || 0) + (bookingTagsCount || 0) + (tripTagsCount || 0);
         
         return {
           id: tag.id,
@@ -169,6 +187,7 @@ const TagsPage = () => {
           description: "There are no tags with the same name to merge.",
           variant: "default"
         });
+        setMergeLoading(false);
         return;
       }
       
@@ -272,6 +291,7 @@ const TagsPage = () => {
           description: `A tag with the name "${existingTag.name}" already exists.`,
           variant: "destructive"
         });
+        setIsSubmitting(false);
         return;
       }
       
@@ -352,6 +372,7 @@ const TagsPage = () => {
           variant: "default"
         });
         setOpenDeleteDialog(false);
+        setRemoveUnusedLoading(false);
         return;
       }
       
@@ -500,12 +521,26 @@ const TagsPage = () => {
                         <TableCell>{tag.usageCount} uses</TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button variant="ghost" size="icon">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" disabled>
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Edit (use Batch Edit for now)</p></TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-destructive" disabled>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Delete (use Remove Unused for now)</p></TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -530,7 +565,7 @@ const TagsPage = () => {
                       <Button 
                         variant="outline" 
                         onClick={handleMergeSimilarTags}
-                        disabled={mergeLoading}
+                        disabled={mergeLoading || loading}
                       >
                         <Merge className="mr-2 h-4 w-4" />
                         {mergeLoading ? 'Merging...' : 'Merge Similar Tags'}
@@ -548,7 +583,7 @@ const TagsPage = () => {
                       <Button 
                         variant="outline" 
                         onClick={handleRemoveUnusedTags}
-                        disabled={removeUnusedLoading || unusedTagsCount === 0}
+                        disabled={removeUnusedLoading || unusedTagsCount === 0 || loading}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         {removeUnusedLoading ? 'Removing...' : 'Remove Unused Tags'}
@@ -560,7 +595,7 @@ const TagsPage = () => {
                   </Tooltip>
                 </TooltipProvider>
                 
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => navigate("/admin/tags/batch-edit")}>
                   <Edit className="mr-2 h-4 w-4" />
                   Batch Edit Tags
                 </Button>

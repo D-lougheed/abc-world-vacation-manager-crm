@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +26,7 @@ import AgentsPage from "./pages/AgentsPage";
 import AddAgentPage from "./pages/AddAgentPage";
 import ServiceTypesPage from "./pages/ServiceTypesPage";
 import TagsPage from "./pages/TagsPage";
+import BatchEditTagsPage from "./pages/BatchEditTagsPage"; // Import the new page
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -88,7 +90,8 @@ const App = () => (
               <Route path="/admin/agents/new" element={<AddAgentPage />} />
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
-              <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} /> {/* New Route */}
+              <Route path="/admin/tags/batch-edit" element={<BatchEditTagsPage />} /> {/* New Route for Batch Edit Tags */}
+              <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} />
 
               {/* Mass Import Routes */}
               <Route path="/admin/import" element={<AdminImportOverviewPage />} />
