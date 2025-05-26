@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UserRole, User as AuthUserType } from "@/types"; // Renamed User to AuthUserType to avoid conflict
+import { UserRole } from "@/types"; // Renamed User to AuthUserType to avoid conflict
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
@@ -39,6 +40,12 @@ const formSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
+  agentCommissionPercentage: z.coerce // Use coerce to convert string from input to number
+    .number({ invalid_type_error: "Commission must be a number" })
+    .min(0, "Commission cannot be less than 0")
+    .max(100, "Commission cannot be more than 100")
+    .optional()
+    .nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -58,6 +65,7 @@ const AddAgentForm = () => {
       email: "",
       role: UserRole.Agent,
       password: "",
+      agentCommissionPercentage: 50, // Default to 50%
     },
   });
 
@@ -75,6 +83,9 @@ const AddAgentForm = () => {
       console.log("Got session, access token available");
 
       // Call our edge function to create the agent - using the full URL
+      // IMPORTANT: The create-agent edge function needs to be updated to handle agentCommissionPercentage.
+      // Since I cannot modify edge functions directly, this field might not be saved for new agents
+      // until the edge function is updated manually.
       const response = await fetch('https://gvslnylvljmhvlkixmmu.supabase.co/functions/v1/create-agent', {
         method: 'POST',
         headers: {
@@ -86,12 +97,13 @@ const AddAgentForm = () => {
           password: values.password,
           firstName: values.firstName,
           lastName: values.lastName,
-          role: values.role
+          role: values.role,
+          agentCommissionPercentage: values.agentCommissionPercentage !== null && values.agentCommissionPercentage !== undefined ? values.agentCommissionPercentage : 50, // Send commission, default if null/undefined
         })
       });
       
       console.log("Response status:", response.status);
-      const responseData = await response.json(); // Changed variable name from data to responseData
+      const responseData = await response.json(); 
       console.log("Response data:", responseData);
       
       if (!response.ok) {
@@ -104,7 +116,11 @@ const AddAgentForm = () => {
           action: 'CREATE_AGENT',
           resourceType: 'Agent',
           resourceId: responseData.user.id, // ID of the created agent user
-          details: { email: values.email, role: values.role },
+          details: { 
+            email: values.email, 
+            role: values.role, 
+            agentCommissionPercentage: values.agentCommissionPercentage 
+          },
         });
       }
 
@@ -119,7 +135,7 @@ const AddAgentForm = () => {
       console.error("Error creating agent:", error);
       toast({
         title: "Failed to create agent",
-        description: error.message || "There was an error creating the agent",
+        description: error.message || "There was an error creating the agent. Note: The 'create-agent' edge function might need an update to save commission percentage.",
         variant: "destructive",
       });
       // Optionally log the failure as well
@@ -207,6 +223,26 @@ const AddAgentForm = () => {
             </FormItem>
           )}
         />
+        
+        <FormField
+          control={form.control}
+          name="agentCommissionPercentage"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Agent Commission Percentage (%)</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  placeholder="50" 
+                  {...field} 
+                  value={field.value ?? ""}
+                  onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
@@ -244,3 +280,4 @@ const AddAgentForm = () => {
 };
 
 export default AddAgentForm;
+

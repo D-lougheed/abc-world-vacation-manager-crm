@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -9,6 +8,7 @@ import {
   Check,
   X,
   Shield,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,12 @@ const AgentsPage = () => {
     is_active: z.boolean(),
     password: z.string().optional(),
     role: z.enum(["SuperAdmin", "Admin", "Agent"]),
+    agent_commission_percentage: z.coerce
+      .number({ invalid_type_error: "Commission must be a number" })
+      .min(0, "Commission cannot be less than 0")
+      .max(100, "Commission cannot be more than 100")
+      .optional()
+      .nullable(),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -88,6 +94,7 @@ const AgentsPage = () => {
       is_active: true,
       password: "",
       role: "Agent" as "SuperAdmin" | "Admin" | "Agent",
+      agent_commission_percentage: 50,
     },
   });
 
@@ -105,7 +112,15 @@ const AgentsPage = () => {
           throw error;
         }
         
-        setAgents(data || []);
+        // Ensure agent_commission_percentage has a default if null/undefined
+        const agentsWithDefaultCommission = (data || []).map(agent => ({
+          ...agent,
+          agent_commission_percentage: agent.agent_commission_percentage === null || agent.agent_commission_percentage === undefined 
+            ? 50 
+            : agent.agent_commission_percentage
+        }));
+        setAgents(agentsWithDefaultCommission);
+
       } catch (error: any) {
         console.error('Error fetching agents:', error);
         toast({
@@ -175,6 +190,9 @@ const AgentsPage = () => {
       is_active: agent.is_active || false,
       password: "",
       role: agent.role || "Agent",
+      agent_commission_percentage: agent.agent_commission_percentage === null || agent.agent_commission_percentage === undefined 
+        ? 50 
+        : agent.agent_commission_percentage,
     });
     setShouldResetPassword(false);
     setEditDialogOpen(true);
@@ -195,6 +213,7 @@ const AgentsPage = () => {
           last_name: values.last_name,
           is_active: values.is_active,
           role: values.role,
+          agent_commission_percentage: values.agent_commission_percentage !== null && values.agent_commission_percentage !== undefined ? values.agent_commission_percentage : 50,
           updated_at: new Date().toISOString(),
         })
         .eq('id', selectedAgent.id);
@@ -213,6 +232,11 @@ const AgentsPage = () => {
       
       // Update password if provided
       if (shouldResetPassword && values.password) {
+        if (values.password.length < 8 || !/[A-Z]/.test(values.password) || !/[0-9]/.test(values.password)) {
+          form.setError("password", { type: "manual", message: "Password must be at least 8 characters, include an uppercase letter and a number." });
+          setUpdateLoading(false);
+          return;
+        }
         const { error: passwordError } = await supabase.auth.admin.updateUserById(
           selectedAgent.id,
           { password: values.password }
@@ -222,14 +246,20 @@ const AgentsPage = () => {
       }
       
       // Refetch agents to update the view
-      const { data: updatedAgents, error: fetchError } = await supabase
+      const { data: rawUpdatedAgents, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .order('last_name', { ascending: true });
       
       if (fetchError) throw fetchError;
       
-      setAgents(updatedAgents || []);
+      const updatedAgentsWithDefaultCommission = (rawUpdatedAgents || []).map(agent => ({
+        ...agent,
+        agent_commission_percentage: agent.agent_commission_percentage === null || agent.agent_commission_percentage === undefined 
+          ? 50 
+          : agent.agent_commission_percentage
+      }));
+      setAgents(updatedAgentsWithDefaultCommission);
       setEditDialogOpen(false);
       
       toast({
@@ -303,13 +333,14 @@ const AgentsPage = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Commission %</TableHead> 
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
+                      <TableCell colSpan={6} className="text-center py-8">
                         Loading agents...
                       </TableCell>
                     </TableRow>
@@ -348,6 +379,12 @@ const AgentsPage = () => {
                               {agent.is_active ? "Active" : "Inactive"}
                             </Badge>
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Percent className="h-3 w-3 text-muted-foreground" />
+                              {agent.agent_commission_percentage !== null && agent.agent_commission_percentage !== undefined ? agent.agent_commission_percentage : 'N/A'}%
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button 
                               variant="outline" 
@@ -366,7 +403,7 @@ const AgentsPage = () => {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No agents found. Try a different search term or add a new agent.
                       </TableCell>
                     </TableRow>
@@ -428,6 +465,25 @@ const AgentsPage = () => {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="agent_commission_percentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Agent Commission Percentage (%)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="50" 
+                        {...field} 
+                        value={field.value ?? ""}
+                        onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="reset-password" 
@@ -444,7 +500,7 @@ const AgentsPage = () => {
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <Input type="password" placeholder="Min 8 chars, 1 uppercase, 1 number" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
