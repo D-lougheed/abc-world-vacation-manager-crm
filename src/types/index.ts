@@ -77,6 +77,13 @@ export enum CommissionStatus {
   Completed = "Completed"
 }
 
+export enum BillingStatus {
+  Draft = "Draft",
+  AwaitingDeposit = "Awaiting Deposit",
+  AwaitingFinalPayment = "Awaiting Final Payment",
+  Paid = "Paid"
+}
+
 export interface Booking {
   id: string;
   clients: Client[] | string[];
@@ -95,6 +102,9 @@ export interface Booking {
   agent: User | string;
   notes?: string;
   files?: string[];
+  billingStatus?: BillingStatus;
+  depositAmount?: number | null;
+  finalPaymentDueDate?: string | null;
 }
 
 export interface ServiceType {

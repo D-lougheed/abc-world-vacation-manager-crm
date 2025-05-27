@@ -1,10 +1,10 @@
-
 import { useParams } from "react-router-dom";
 import BookingForm from "@/components/forms/BookingForm";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { BillingStatus } from "@/types"; // Import BillingStatus
 
 const EditBookingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +17,6 @@ const EditBookingPage = () => {
       try {
         if (!id) return;
         
-        // Fetch the booking data
         setLoading(true);
         
         const { data, error } = await supabase
@@ -62,7 +61,11 @@ const EditBookingPage = () => {
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
           agentId: data.agent_id,
-          tripId: data.trip_id // Preserve as null if it's null
+          tripId: data.trip_id, // Preserve as null if it's null
+          // Add new billing fields
+          billingStatus: data.billing_status as BillingStatus || BillingStatus.Draft,
+          depositAmount: data.deposit_amount,
+          finalPaymentDueDate: data.final_payment_due_date ? new Date(data.final_payment_due_date) : undefined
         };
         
         console.log("Formatted booking data for form:", formattedData);

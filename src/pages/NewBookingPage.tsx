@@ -1,11 +1,10 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import BookingForm from "@/components/forms/BookingForm";
 import { Loader2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { UserRole, BookingStatus, CommissionStatus } from "@/types";
+import { UserRole, BookingStatus, CommissionStatus, BillingStatus } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -111,6 +110,10 @@ const NewBookingPage = () => {
         // Initialize booking and commission status with defaults
         initialDataObj.bookingStatus = BookingStatus.Pending;
         initialDataObj.commissionStatus = CommissionStatus.Unreceived;
+        // Initialize new billing fields
+        initialDataObj.billingStatus = BillingStatus.Draft;
+        initialDataObj.depositAmount = null;
+        initialDataObj.finalPaymentDueDate = null;
         
         console.log("Initial data for booking form:", initialDataObj);
         setInitialData(initialDataObj);

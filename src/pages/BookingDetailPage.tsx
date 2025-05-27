@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -14,7 +13,9 @@ import {
   Tag,
   User,
   Loader2,
-  Clock
+  Clock,
+  DollarSign,
+  Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { BookingStatus, CommissionStatus, UserRole } from "@/types";
+import { BookingStatus, CommissionStatus, UserRole, BillingStatus } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -233,7 +234,10 @@ const BookingDetailPage = () => {
           commissionStatus: bookingData.commission_status as CommissionStatus,
           agent,
           documents: documents || [],
-          notes: bookingData.notes
+          notes: bookingData.notes,
+          billingStatus: bookingData.billing_status as BillingStatus || BillingStatus.Draft,
+          depositAmount: bookingData.deposit_amount,
+          finalPaymentDueDate: bookingData.final_payment_due_date
         };
         
         setBooking(completeBooking);
@@ -305,6 +309,21 @@ const BookingDetailPage = () => {
     }
   };
 
+  // Function to get billing status badge styling
+  const getBillingStatusBadgeStyle = (status: BillingStatus) => {
+    switch (status) {
+      case BillingStatus.Paid:
+        return "bg-green-100 text-green-800";
+      case BillingStatus.AwaitingDeposit:
+      case BillingStatus.AwaitingFinalPayment:
+        return "bg-yellow-100 text-yellow-800";
+      case BillingStatus.Draft:
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -341,6 +360,14 @@ const BookingDetailPage = () => {
               <Badge className={getCommissionStatusBadgeStyle(booking.commissionStatus)} variant="outline">
                 {booking.commissionStatus}
               </Badge>
+              {booking.billingStatus && (
+                <>
+                  <span>•</span>
+                  <Badge className={getBillingStatusBadgeStyle(booking.billingStatus)} variant="outline">
+                    {booking.billingStatus}
+                  </Badge>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -365,7 +392,7 @@ const BookingDetailPage = () => {
                 <dd>
                   <div className="space-y-2">
                     {booking.clients.length > 0 ? (
-                      booking.clients.map((client) => (
+                      booking.clients.map((client: any) => (
                         <div key={client.id} className="flex items-center rounded-md border px-3 py-2">
                           <Users className="h-4 w-4 text-muted-foreground mr-2" />
                           <span>{client.name}</span>
@@ -448,6 +475,34 @@ const BookingDetailPage = () => {
               <div className="pt-2 border-t">
                 <dt className="text-sm font-medium text-muted-foreground">Cost</dt>
                 <dd className="text-lg font-medium mt-1">${booking.cost.toLocaleString()}</dd>
+              </div>
+
+              {/* New Billing Information Section */}
+              <div className="pt-2 border-t">
+                <dt className="text-sm font-medium text-muted-foreground">Billing Information</dt>
+                <dd className="mt-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                    <span>Billing Status:</span>
+                    <Badge className={getBillingStatusBadgeStyle(booking.billingStatus)} variant="outline">
+                      {booking.billingStatus || BillingStatus.Draft}
+                    </Badge>
+                  </div>
+                  {booking.depositAmount !== null && booking.depositAmount !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span>Deposit Amount:</span>
+                      <span>${booking.depositAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {booking.finalPaymentDueDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>Final Payment Due:</span>
+                      <span>{new Date(booking.finalPaymentDueDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </dd>
               </div>
 
               <div>
@@ -541,7 +596,7 @@ const BookingDetailPage = () => {
               </div>
               <div className="space-y-2">
                 {booking.documents.length > 0 ? (
-                  booking.documents.map((doc) => (
+                  booking.documents.map((doc: any) => (
                     <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />

@@ -140,14 +140,19 @@ export type Database = {
       bookings: {
         Row: {
           agent_id: string
+          billing_status:
+            | Database["public"]["Enums"]["billing_status_enum"]
+            | null
           booking_status: Database["public"]["Enums"]["booking_status"]
           commission_amount: number
           commission_rate: number
           commission_status: Database["public"]["Enums"]["commission_status"]
           cost: number
           created_at: string
+          deposit_amount: number | null
           end_date: string | null
           end_time: string | null
+          final_payment_due_date: string | null
           id: string
           is_completed: boolean
           location: string
@@ -162,14 +167,19 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          billing_status?:
+            | Database["public"]["Enums"]["billing_status_enum"]
+            | null
           booking_status?: Database["public"]["Enums"]["booking_status"]
           commission_amount: number
           commission_rate: number
           commission_status?: Database["public"]["Enums"]["commission_status"]
           cost: number
           created_at?: string
+          deposit_amount?: number | null
           end_date?: string | null
           end_time?: string | null
+          final_payment_due_date?: string | null
           id?: string
           is_completed?: boolean
           location: string
@@ -184,14 +194,19 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          billing_status?:
+            | Database["public"]["Enums"]["billing_status_enum"]
+            | null
           booking_status?: Database["public"]["Enums"]["booking_status"]
           commission_amount?: number
           commission_rate?: number
           commission_status?: Database["public"]["Enums"]["commission_status"]
           cost?: number
           created_at?: string
+          deposit_amount?: number | null
           end_date?: string | null
           end_time?: string | null
+          final_payment_due_date?: string | null
           id?: string
           is_completed?: boolean
           location?: string
@@ -720,6 +735,11 @@ export type Database = {
       }
     }
     Enums: {
+      billing_status_enum:
+        | "Draft"
+        | "Awaiting Deposit"
+        | "Awaiting Final Payment"
+        | "Paid"
       booking_status: "Pending" | "Confirmed" | "Canceled"
       commission_status: "Unreceived" | "Received" | "Canceled" | "Completed"
       trip_status: "Planned" | "Ongoing" | "Completed" | "Canceled"
@@ -839,6 +859,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      billing_status_enum: [
+        "Draft",
+        "Awaiting Deposit",
+        "Awaiting Final Payment",
+        "Paid",
+      ],
       booking_status: ["Pending", "Confirmed", "Canceled"],
       commission_status: ["Unreceived", "Received", "Canceled", "Completed"],
       trip_status: ["Planned", "Ongoing", "Completed", "Canceled"],
