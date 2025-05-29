@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -15,7 +16,8 @@ import {
   Loader2,
   Clock,
   DollarSign,
-  Receipt
+  Receipt,
+  Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -31,6 +33,7 @@ import { BookingStatus, CommissionStatus, UserRole, BillingStatus } from "@/type
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 // Define interfaces for our data structures
 interface VendorType {
@@ -63,6 +66,25 @@ const BookingDetailPage = () => {
     const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
     
     return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Function to render rating as stars
+  const renderRating = (rating: number = 0, color: string = "text-yellow-400") => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(<Star key={i} className={`h-4 w-4 ${color} fill-current`} />);
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(<Star key={i} className={`h-4 w-4 ${color}`} />);
+      } else {
+        stars.push(<Star key={i} className="h-4 w-4 text-muted-foreground/30" />);
+      }
+    }
+
+    return <div className="flex items-center space-x-1">{stars}</div>;
   };
 
   // Fetch booking data from Supabase
@@ -192,6 +214,8 @@ const BookingDetailPage = () => {
         
         // Fetch agent data
         let agent: AgentType = { name: "Unknown Agent", email: "" };
+        let subAgent: AgentType | null = null;
+        
         if (bookingData.agent_id) {
           const { data: agentData, error: agentError } = await supabase
             .from('profiles')
@@ -204,6 +228,23 @@ const BookingDetailPage = () => {
               id: bookingData.agent_id,
               name: `${agentData.first_name} ${agentData.last_name}`,
               email: agentData.email
+            };
+          }
+        }
+
+        // Fetch sub-agent data if exists
+        if (bookingData.sub_agent_id) {
+          const { data: subAgentData, error: subAgentError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', bookingData.sub_agent_id)
+            .single();
+          
+          if (!subAgentError && subAgentData) {
+            subAgent = {
+              id: bookingData.sub_agent_id,
+              name: `${subAgentData.first_name} ${subAgentData.last_name}`,
+              email: subAgentData.email
             };
           }
         }
@@ -246,11 +287,14 @@ const BookingDetailPage = () => {
           isCompleted: bookingData.is_completed,
           commissionStatus: bookingData.commission_status as CommissionStatus,
           agent,
+          subAgent,
           documents: documents || [],
           notes: bookingData.notes,
           billingStatus: bookingData.billing_status as BillingStatus || BillingStatus.Draft,
           depositAmount: bookingData.deposit_amount,
-          finalPaymentDueDate: bookingData.final_payment_due_date
+          finalPaymentDueDate: bookingData.final_payment_due_date,
+          rating: bookingData.rating,
+          clientRating: bookingData.client_rating
         };
         
         setBooking(completeBooking);
@@ -393,243 +437,319 @@ const BookingDetailPage = () => {
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-6">
-        <Card className="col-span-3 md:col-span-1">
-          <CardHeader>
-            <CardTitle>Booking Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-4">
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground mb-2">Client(s)</dt>
-                <dd>
-                  <div className="space-y-2">
-                    {booking.clients.length > 0 ? (
-                      booking.clients.map((client: any) => (
-                        <div key={client.id} className="flex items-center rounded-md border px-3 py-2">
-                          <Users className="h-4 w-4 text-muted-foreground mr-2" />
-                          <span>{client.name}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-muted-foreground">No clients assigned</div>
-                    )}
-                  </div>
-                </dd>
+      {/* Two Column Layout matching BookingForm */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column - Booking Details */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Booking Details</CardTitle>
+              <CardDescription>Basic information for this booking</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Client Selection */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Clients</div>
+                <div className="space-y-2">
+                  {booking.clients.length > 0 ? (
+                    booking.clients.map((client: any) => (
+                      <div key={client.id} className="flex items-center rounded-md border px-3 py-2">
+                        <Users className="h-4 w-4 text-muted-foreground mr-2" />
+                        <span>{client.name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No clients assigned</div>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Vendor</dt>
-                <dd className="flex items-center gap-2 mt-1">
+              {/* Vendor */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Vendor</div>
+                <div className="flex items-center gap-2">
                   <Briefcase className="h-4 w-4 text-muted-foreground" />
                   <span>{booking.vendor.name}</span>
-                </dd>
+                </div>
               </div>
 
-              {booking.trip && (
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Associated Trip</dt>
-                  <dd className="flex items-center gap-2 mt-1">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{booking.trip.name}</span>
-                  </dd>
-                </div>
-              )}
-
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Service Type</dt>
-                <dd className="flex items-center gap-2 mt-1">
+              {/* Service Type */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Service Type</div>
+                <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   <Badge variant="secondary">{booking.serviceType}</Badge>
-                </dd>
+                </div>
               </div>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Date & Time</dt>
-                <dd>
-                  <div className="rounded-md border p-3 space-y-3">
+              {/* Trip */}
+              {booking.trip && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Associated Trip</div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{booking.trip.name}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Booking Agent Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Booking Agent</CardTitle>
+              <CardDescription>Agent information for this booking</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Primary Agent */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Primary Agent</div>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span>{booking.agent.name}</span>
+                </div>
+              </div>
+
+              {/* Sub-Agent */}
+              {booking.subAgent && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Sub-Agent</div>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span>{booking.subAgent.name}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Date & Time</CardTitle>
+              <CardDescription>Date and time for this booking</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Start Date & Time */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Start Date & Time</div>
+                <div className="rounded-md border p-3">
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <div>{new Date(booking.startDate).toLocaleDateString()}</div>
+                      <div className="text-sm flex items-center mt-1">
+                        <Clock className="h-3 w-3 text-muted-foreground mr-1" />
+                        <span className="text-muted-foreground">{booking.startTime}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* End Date & Time */}
+              {booking.endDate && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">End Date & Time</div>
+                  <div className="rounded-md border p-3">
                     <div className="flex items-start gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
                       <div>
-                        <div className="font-medium">Start</div>
-                        <div>{new Date(booking.startDate).toLocaleDateString()}</div>
+                        <div>{new Date(booking.endDate).toLocaleDateString()}</div>
                         <div className="text-sm flex items-center mt-1">
                           <Clock className="h-3 w-3 text-muted-foreground mr-1" />
-                          <span className="text-muted-foreground">{booking.startTime}</span>
+                          <span className="text-muted-foreground">{booking.endTime}</span>
                         </div>
                       </div>
                     </div>
-                  
-                    {booking.endDate && (
-                      <div className="flex items-start gap-2 pt-2 border-t">
-                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <div>
-                          <div className="font-medium">End</div>
-                          <div>{new Date(booking.endDate).toLocaleDateString()}</div>
-                          <div className="text-sm flex items-center mt-1">
-                            <Clock className="h-3 w-3 text-muted-foreground mr-1" />
-                            <span className="text-muted-foreground">{booking.endTime}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </dd>
-              </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Location</dt>
-                <dd className="flex items-start gap-2 mt-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Location & Details</CardTitle>
+              <CardDescription>Additional booking information</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Location */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Location</div>
+                <div className="flex items-start gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <span>{booking.location}</span>
-                </dd>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Billing, Commission & Status */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing Information</CardTitle>
+              <CardDescription>Payment and billing details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Cost */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Cost</div>
+                <div className="text-lg font-medium">${booking.cost.toLocaleString()}</div>
               </div>
 
-              <div className="pt-2 border-t">
-                <dt className="text-sm font-medium text-muted-foreground">Cost</dt>
-                <dd className="text-lg font-medium mt-1">${booking.cost.toLocaleString()}</dd>
+              {/* Billing Status */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Billing Status</div>
+                <Badge className={getBillingStatusBadgeStyle(booking.billingStatus)} variant="outline">
+                  {booking.billingStatus || BillingStatus.Draft}
+                </Badge>
               </div>
 
-              {/* New Billing Information Section */}
-              <div className="pt-2 border-t">
-                <dt className="text-sm font-medium text-muted-foreground">Billing Information</dt>
-                <dd className="mt-1 space-y-2">
+              {/* Deposit Amount */}
+              {booking.depositAmount !== null && booking.depositAmount !== undefined && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Deposit Amount</div>
                   <div className="flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                    <span>Billing Status:</span>
-                    <Badge className={getBillingStatusBadgeStyle(booking.billingStatus)} variant="outline">
-                      {booking.billingStatus || BillingStatus.Draft}
-                    </Badge>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <span>${booking.depositAmount.toLocaleString()}</span>
                   </div>
-                  {booking.depositAmount !== null && booking.depositAmount !== undefined && (
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span>Deposit Amount:</span>
-                      <span>${booking.depositAmount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {booking.finalPaymentDueDate && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Final Payment Due:</span>
-                      <span>{new Date(booking.finalPaymentDueDate).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                </dd>
+                </div>
+              )}
+
+              {/* Final Payment Due Date */}
+              {booking.finalPaymentDueDate && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Final Payment Due Date</div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{new Date(booking.finalPaymentDueDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Commission Details</CardTitle>
+              <CardDescription>Financial details and commission</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Commission Rate */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Commission Rate (%)</div>
+                <div>{booking.commissionRate}%</div>
               </div>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Commission Details</dt>
-                <dd className="mt-1">
-                  <div className="rounded-md border p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-muted-foreground">Rate</span>
-                      <span>{booking.commissionRate}%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Amount</span>
-                      <span className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </dd>
+              {/* Commission Amount */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Commission Amount</div>
+                <div className="font-medium text-primary">${booking.commissionAmount.toLocaleString()}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Status Management</CardTitle>
+              <CardDescription>Booking and commission status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Booking Status */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">Booking Status</div>
+                <Badge className={getBookingStatusBadgeStyle(booking.bookingStatus)}>
+                  {booking.bookingStatus}
+                </Badge>
               </div>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Booking Status</dt>
-                <dd className="mt-1">
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant={booking.bookingStatus === BookingStatus.Pending ? "default" : "outline"}>
-                      Pending
-                    </Button>
-                    <Button size="sm" variant={booking.bookingStatus === BookingStatus.Confirmed ? "default" : "outline"}>
-                      Confirmed
-                    </Button>
-                    <Button size="sm" variant={booking.bookingStatus === BookingStatus.Canceled ? "destructive" : "outline"}>
-                      Canceled
-                    </Button>
-                  </div>
-                </dd>
-              </div>
-
+              {/* Commission Status */}
               <RoleBasedComponent requiredRole={UserRole.Admin}>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Commission Status</dt>
-                  <dd className="mt-1">
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant={booking.commissionStatus === CommissionStatus.Unreceived ? "default" : "outline"}>
-                        Unreceived
-                      </Button>
-                      <Button size="sm" variant={booking.commissionStatus === CommissionStatus.Received ? "default" : "outline"}>
-                        Received
-                      </Button>
-                      <Button size="sm" variant={booking.commissionStatus === CommissionStatus.Completed ? "default" : "outline"}>
-                        Completed
-                      </Button>
-                      <Button size="sm" variant={booking.commissionStatus === CommissionStatus.Canceled ? "destructive" : "outline"}>
-                        Canceled
-                      </Button>
-                    </div>
-                  </dd>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Commission Status</div>
+                  <Badge className={getCommissionStatusBadgeStyle(booking.commissionStatus)} variant="outline">
+                    {booking.commissionStatus}
+                  </Badge>
                 </div>
               </RoleBasedComponent>
 
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Agent</dt>
-                <dd className="flex items-center gap-2 mt-1">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span>{booking.agent.name}</span>
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-        
-        <Card className="col-span-3 md:col-span-2">
-          <CardHeader>
-            <CardTitle>Additional Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Notes</h3>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="min-h-[150px]"
-                onBlur={updateNotes}
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Documents</h3>
-                <Button variant="ghost" size="sm">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload
-                </Button>
-              </div>
+              {/* Completion Status */}
               <div className="space-y-2">
-                {booking.documents.length > 0 ? (
-                  booking.documents.map((doc: any) => (
-                    <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>{doc.file_name}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(doc.uploaded_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    No documents uploaded yet.
-                  </div>
-                )}
+                <div className="text-sm font-medium text-muted-foreground">Completion Status</div>
+                <Badge variant={booking.isCompleted ? "default" : "secondary"}>
+                  {booking.isCompleted ? "Completed" : "Not Completed"}
+                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {/* Vendor Rating */}
+              {booking.rating && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Vendor Rating</div>
+                  {renderRating(booking.rating, "text-yellow-500")}
+                </div>
+              )}
+
+              {/* Client Rating */}
+              {booking.clientRating && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Client Rating</div>
+                  {renderRating(booking.clientRating, "text-blue-500")}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
+      
+      {/* Notes and Documents Section - Full Width */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Notes</h3>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="min-h-[150px]"
+              onBlur={updateNotes}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Documents</h3>
+              <Button variant="ghost" size="sm">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {booking.documents.length > 0 ? (
+                booking.documents.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span>{doc.file_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(doc.uploaded_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No documents uploaded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
