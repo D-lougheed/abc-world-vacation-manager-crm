@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -634,20 +635,6 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   )}
                 </div>
 
-                {/* Cost */}
-                <div className="space-y-2">
-                  <Label htmlFor="cost">Cost *</Label>
-                  <Input
-                    type="number"
-                    id="cost"
-                    placeholder="0.00"
-                    {...register("cost", { valueAsNumber: true })}
-                  />
-                  {errors.cost && (
-                    <p className="text-sm text-destructive">{errors.cost.message}</p>
-                  )}
-                </div>
-
                 {/* Notes */}
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
@@ -661,8 +648,100 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
             </Card>
           </div>
 
-          {/* Right Column - Commission & Status */}
+          {/* Right Column - Billing, Commission & Status */}
           <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Billing Information</CardTitle>
+                <CardDescription>Payment and billing details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Cost - Moved here from Location & Details */}
+                <div className="space-y-2">
+                  <Label htmlFor="cost">Cost *</Label>
+                  <Input
+                    type="number"
+                    id="cost"
+                    placeholder="0.00"
+                    {...register("cost", { valueAsNumber: true })}
+                  />
+                  {errors.cost && (
+                    <p className="text-sm text-destructive">{errors.cost.message}</p>
+                  )}
+                </div>
+
+                {/* Billing Status */}
+                <div className="space-y-2">
+                  <Label htmlFor="billingStatus">Billing Status</Label>
+                  <Select value={watch("billingStatus")} onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BillingStatus.Draft}>Draft</SelectItem>
+                      <SelectItem value={BillingStatus.AwaitingDeposit}>Awaiting Deposit</SelectItem>
+                      <SelectItem value={BillingStatus.AwaitingFinalPayment}>Awaiting Final Payment</SelectItem>
+                      <SelectItem value={BillingStatus.Paid}>Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.billingStatus && (
+                    <p className="text-sm text-destructive">{errors.billingStatus.message}</p>
+                  )}
+                </div>
+
+                {/* Deposit Amount */}
+                <div className="space-y-2">
+                  <Label htmlFor="depositAmount">Deposit Amount</Label>
+                  <Input
+                    type="number"
+                    id="depositAmount"
+                    placeholder="0.00"
+                    {...register("depositAmount", { valueAsNumber: true })}
+                  />
+                  {errors.depositAmount && (
+                    <p className="text-sm text-destructive">{errors.depositAmount.message}</p>
+                  )}
+                </div>
+
+                {/* Final Payment Due Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="finalPaymentDueDate">Final Payment Due Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !watch("finalPaymentDueDate") && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {watch("finalPaymentDueDate") ? (
+                          format(watch("finalPaymentDueDate"), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={watch("finalPaymentDueDate")}
+                        onSelect={(date) => setValue("finalPaymentDueDate", date)}
+                        disabled={(date) =>
+                          date < new Date()
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.finalPaymentDueDate && (
+                    <p className="text-sm text-destructive">{errors.finalPaymentDueDate.message}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Commission Details</CardTitle>
@@ -802,84 +881,6 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   </div>
                   {errors.clientRating && (
                     <p className="text-sm text-destructive">{errors.clientRating.message}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Billing Information</CardTitle>
-                <CardDescription>Payment and billing details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Billing Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="billingStatus">Billing Status</Label>
-                  <Select value={watch("billingStatus")} onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={BillingStatus.Draft}>Draft</SelectItem>
-                      <SelectItem value={BillingStatus.AwaitingDeposit}>Awaiting Deposit</SelectItem>
-                      <SelectItem value={BillingStatus.AwaitingFinalPayment}>Awaiting Final Payment</SelectItem>
-                      <SelectItem value={BillingStatus.Paid}>Paid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.billingStatus && (
-                    <p className="text-sm text-destructive">{errors.billingStatus.message}</p>
-                  )}
-                </div>
-
-                {/* Deposit Amount */}
-                <div className="space-y-2">
-                  <Label htmlFor="depositAmount">Deposit Amount</Label>
-                  <Input
-                    type="number"
-                    id="depositAmount"
-                    placeholder="0.00"
-                    {...register("depositAmount", { valueAsNumber: true })}
-                  />
-                  {errors.depositAmount && (
-                    <p className="text-sm text-destructive">{errors.depositAmount.message}</p>
-                  )}
-                </div>
-
-                {/* Final Payment Due Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="finalPaymentDueDate">Final Payment Due Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !watch("finalPaymentDueDate") && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {watch("finalPaymentDueDate") ? (
-                          format(watch("finalPaymentDueDate"), "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={watch("finalPaymentDueDate")}
-                        onSelect={(date) => setValue("finalPaymentDueDate", date)}
-                        disabled={(date) =>
-                          date < new Date()
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {errors.finalPaymentDueDate && (
-                    <p className="text-sm text-destructive">{errors.finalPaymentDueDate.message}</p>
                   )}
                 </div>
               </CardContent>
