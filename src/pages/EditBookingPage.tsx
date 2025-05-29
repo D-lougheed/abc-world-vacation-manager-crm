@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import BookingForm from "@/components/forms/BookingForm";
 import { Loader2 } from "lucide-react";
@@ -60,6 +61,7 @@ const EditBookingPage = () => {
           bookingStatus: data.booking_status,
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
+          rating: data.rating,
           agentId: data.agent_id,
           tripId: data.trip_id, // Preserve as null if it's null
           // Add new billing fields
@@ -98,8 +100,6 @@ const EditBookingPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Edit Booking</h1>
-      
       {bookingData && (
         <BookingForm 
           initialData={bookingData} 

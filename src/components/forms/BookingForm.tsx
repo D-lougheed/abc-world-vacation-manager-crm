@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -8,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -28,7 +28,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Plus, Star } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +55,8 @@ const bookingSchema = z.object({
   billingStatus: z.enum(["Draft", "Awaiting Deposit", "Awaiting Final Payment", "Paid"]).optional(),
   depositAmount: z.number().optional(),
   finalPaymentDueDate: z.date().optional(),
+  isCompleted: z.boolean().optional(),
+  rating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
 });
 
@@ -121,6 +123,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       commissionStatus: CommissionStatus.Unreceived,
       billingStatus: BillingStatus.Draft,
       commissionRate: defaultCommissionRate,
+      isCompleted: false,
       ...initialData,
     },
   });
@@ -129,6 +132,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const watchedServiceType = watch("serviceType");
   const watchedCost = watch("cost");
   const watchedCommissionRate = watch("commissionRate");
+  const watchedRating = watch("rating");
 
   // Calculate commission amount when cost or rate changes
   const commissionAmount = watchedCost && watchedCommissionRate 
@@ -334,6 +338,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         billing_status: data.billingStatus || BillingStatus.Draft,
         deposit_amount: data.depositAmount || null,
         final_payment_due_date: data.finalPaymentDueDate ? format(data.finalPaymentDueDate, "yyyy-MM-dd") : null,
+        is_completed: data.isCompleted || false,
+        rating: data.rating || null,
         notes: data.notes || null,
         agent_id: initialData?.agentId || agents[0]?.id || null,
       };
@@ -730,6 +736,48 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                     <p className="text-sm text-destructive">{errors.commissionStatus.message}</p>
                   )}
                 </div>
+
+                {/* Completion Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isCompleted"
+                      checked={watch("isCompleted") || false}
+                      onCheckedChange={(checked) => setValue("isCompleted", checked as boolean)}
+                    />
+                    <Label htmlFor="isCompleted">Mark as Completed</Label>
+                  </div>
+                  {errors.isCompleted && (
+                    <p className="text-sm text-destructive">{errors.isCompleted.message}</p>
+                  )}
+                </div>
+
+                {/* Rating (only show if completed) */}
+                {watch("isCompleted") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating</Label>
+                    <div className="flex items-center space-x-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setValue("rating", star)}
+                          className={cn(
+                            "p-1 rounded-full hover:bg-muted transition-colors",
+                            watchedRating && star <= watchedRating 
+                              ? "text-yellow-500" 
+                              : "text-gray-300"
+                          )}
+                        >
+                          <Star className="h-6 w-6 fill-current" />
+                        </button>
+                      ))}
+                    </div>
+                    {errors.rating && (
+                      <p className="text-sm text-destructive">{errors.rating.message}</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
