@@ -62,6 +62,7 @@ const EditBookingPage = () => {
           commissionStatus: data.commission_status,
           isCompleted: data.is_completed,
           rating: data.rating,
+          clientRating: data.client_rating,
           agentId: data.agent_id,
           tripId: data.trip_id, // Preserve as null if it's null
           // Add new billing fields

@@ -57,6 +57,7 @@ const bookingSchema = z.object({
   finalPaymentDueDate: z.date().optional(),
   isCompleted: z.boolean().optional(),
   rating: z.number().min(1).max(5).optional(),
+  clientRating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
 });
 
@@ -133,6 +134,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const watchedCost = watch("cost");
   const watchedCommissionRate = watch("commissionRate");
   const watchedRating = watch("rating");
+  const watchedClientRating = watch("clientRating");
 
   // Calculate commission amount when cost or rate changes
   const commissionAmount = watchedCost && watchedCommissionRate 
@@ -340,6 +342,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         final_payment_due_date: data.finalPaymentDueDate ? format(data.finalPaymentDueDate, "yyyy-MM-dd") : null,
         is_completed: data.isCompleted || false,
         rating: data.rating || null,
+        client_rating: data.clientRating || null,
         notes: data.notes || null,
         agent_id: initialData?.agentId || agents[0]?.id || null,
       };
@@ -752,32 +755,55 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   )}
                 </div>
 
-                {/* Rating (only show if completed) */}
-                {watch("isCompleted") && (
-                  <div className="space-y-2">
-                    <Label htmlFor="rating">Rating</Label>
-                    <div className="flex items-center space-x-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setValue("rating", star)}
-                          className={cn(
-                            "p-1 rounded-full hover:bg-muted transition-colors",
-                            watchedRating && star <= watchedRating 
-                              ? "text-yellow-500" 
-                              : "text-gray-300"
-                          )}
-                        >
-                          <Star className="h-6 w-6 fill-current" />
-                        </button>
-                      ))}
-                    </div>
-                    {errors.rating && (
-                      <p className="text-sm text-destructive">{errors.rating.message}</p>
-                    )}
+                {/* Vendor Rating - Always visible */}
+                <div className="space-y-2">
+                  <Label htmlFor="rating">Vendor Rating</Label>
+                  <div className="flex items-center space-x-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setValue("rating", star)}
+                        className={cn(
+                          "p-1 rounded-full hover:bg-muted transition-colors",
+                          watchedRating && star <= watchedRating 
+                            ? "text-yellow-500" 
+                            : "text-gray-300"
+                        )}
+                      >
+                        <Star className="h-6 w-6 fill-current" />
+                      </button>
+                    ))}
                   </div>
-                )}
+                  {errors.rating && (
+                    <p className="text-sm text-destructive">{errors.rating.message}</p>
+                  )}
+                </div>
+
+                {/* Client Rating - Always visible */}
+                <div className="space-y-2">
+                  <Label htmlFor="clientRating">Client Rating</Label>
+                  <div className="flex items-center space-x-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setValue("clientRating", star)}
+                        className={cn(
+                          "p-1 rounded-full hover:bg-muted transition-colors",
+                          watchedClientRating && star <= watchedClientRating 
+                            ? "text-blue-500" 
+                            : "text-gray-300"
+                        )}
+                      >
+                        <Star className="h-6 w-6 fill-current" />
+                      </button>
+                    ))}
+                  </div>
+                  {errors.clientRating && (
+                    <p className="text-sm text-destructive">{errors.clientRating.message}</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

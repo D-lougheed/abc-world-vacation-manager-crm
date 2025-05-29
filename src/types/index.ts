@@ -115,6 +115,8 @@ export interface Booking {
   billingStatus?: BillingStatus;
   depositAmount?: number | null;
   finalPaymentDueDate?: string | null;
+  rating?: number | null; // Vendor rating
+  clientRating?: number | null; // Client rating
 }
 
 export interface ServiceType {
