@@ -88,10 +88,11 @@ interface ServiceType {
   name: string;
 }
 
-interface Agent {
+interface User {
   id: string;
   first_name: string;
   last_name: string;
+  role: string;
 }
 
 interface BookingFormProps {
@@ -108,10 +109,12 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [filteredServiceTypes, setFilteredServiceTypes] = useState<ServiceType[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(10);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
 
   const isEditing = !!bookingId;
+  const canEditAgents = currentUserRole === "Admin" || currentUserRole === "SuperAdmin";
 
   const {
     register,
@@ -185,6 +188,20 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     try {
       setLoading(true);
 
+      // Get current user's role
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", currentUser.user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUserRole(profile.role);
+        }
+      }
+
       // Fetch default commission rate
       const { data: commissionSetting } = await supabase
         .from("system_settings")
@@ -200,25 +217,25 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         }
       }
 
-      const [clientsResult, vendorsResult, tripsResult, serviceTypesResult, agentsResult] = await Promise.all([
+      const [clientsResult, vendorsResult, tripsResult, serviceTypesResult, usersResult] = await Promise.all([
         supabase.from("clients").select("id, first_name, last_name").order("first_name"),
         supabase.from("vendors").select("id, name").order("name"),
         supabase.from("trips").select("id, name, start_date, end_date").order("start_date", { ascending: false }),
         supabase.from("service_types").select("id, name").order("name"),
-        supabase.from("profiles").select("id, first_name, last_name").eq("role", "Agent").order("first_name"),
+        supabase.from("profiles").select("id, first_name, last_name, role").order("first_name"),
       ]);
 
       if (clientsResult.error) throw clientsResult.error;
       if (vendorsResult.error) throw vendorsResult.error;
       if (tripsResult.error) throw tripsResult.error;
       if (serviceTypesResult.error) throw serviceTypesResult.error;
-      if (agentsResult.error) throw agentsResult.error;
+      if (usersResult.error) throw usersResult.error;
 
       setClients(clientsResult.data || []);
       setVendors(vendorsResult.data || []);
       setTrips(tripsResult.data || []);
       setServiceTypes(serviceTypesResult.data || []);
-      setAgents(agentsResult.data || []);
+      setUsers(usersResult.data || []);
 
       // If editing and vendor is already selected, fetch service types for that vendor
       if (initialData?.vendor) {
@@ -425,8 +442,8 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     );
   }
 
-  // Find the agent name for display
-  const currentAgent = agents.find(agent => agent.id === initialData?.agentId);
+  // Find the current agent for display
+  const currentAgent = users.find(user => user.id === initialData?.agentId);
   const agentName = currentAgent ? `${currentAgent.first_name} ${currentAgent.last_name}` : "Not assigned";
 
   return (
@@ -533,45 +550,72 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                 <CardDescription>Agent information for this booking</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Primary Agent (Now editable) */}
+                {/* Primary Agent */}
                 <div className="space-y-2">
                   <Label htmlFor="agentId">Primary Agent *</Label>
-                  <Select value={watch("agentId")} onValueChange={(value) => setValue("agentId", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an agent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.first_name} {agent.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.agentId && (
-                    <p className="text-sm text-destructive">{errors.agentId.message}</p>
+                  {canEditAgents ? (
+                    <>
+                      <Select value={watch("agentId")} onValueChange={(value) => setValue("agentId", value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.first_name} {user.last_name} ({user.role})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.agentId && (
+                        <p className="text-sm text-destructive">{errors.agentId.message}</p>
+                      )}
+                    </>
+                  ) : (
+                    <Input
+                      type="text"
+                      id="agentId"
+                      value={agentName}
+                      readOnly
+                      className="bg-muted"
+                    />
                   )}
                 </div>
 
                 {/* Sub-Agent Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="subAgent">Sub-Agent</Label>
-                  <Select value={watch("subAgent")} onValueChange={(value) => setValue("subAgent", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a sub-agent (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.first_name} {agent.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {canEditAgents ? (
+                    <Select value={watch("subAgent")} onValueChange={(value) => setValue("subAgent", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a sub-agent (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.first_name} {user.last_name} ({user.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      type="text"
+                      value={users.find(u => u.id === watch("subAgent"))?.first_name + " " + users.find(u => u.id === watch("subAgent"))?.last_name || "None assigned"}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  )}
                   {errors.subAgent && (
                     <p className="text-sm text-destructive">{errors.subAgent.message}</p>
                   )}
                 </div>
+
+                {!canEditAgents && (
+                  <p className="text-sm text-muted-foreground">
+                    Only administrators can modify agent assignments.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
