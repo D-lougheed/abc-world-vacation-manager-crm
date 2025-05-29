@@ -1,9 +1,8 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { addAuditLog } from "@/services/AuditLogService";
 
 interface VendorFormData {
   name: string;
@@ -27,283 +26,184 @@ interface Tag {
   name: string;
 }
 
+interface ServiceTypeCommission {
+  service_type_id: string;
+  commission_rate: number;
+}
+
+interface UseVendorActionsReturn {
+  saving: boolean;
+  deleteDialogOpen: boolean;
+  setDeleteDialogOpen: (open: boolean) => void;
+  handleSaveVendor: (serviceTypeCommissions?: ServiceTypeCommission[]) => Promise<void>;
+  handleDeleteVendor: () => Promise<void>;
+}
+
 export const useVendorActions = (
   vendorId: string | undefined,
   isNewVendor: boolean,
   formData: VendorFormData,
   serviceTypes: ServiceType[],
   tags: Tag[]
-) => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
+): UseVendorActionsReturn => {
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSaveVendor = async () => {
-    // Define submittedDataForAudit to make it accessible in the catch block
-    const submittedDataForAudit = {
-      name: formData.name,
-      contactPerson: formData.contactPerson,
-      email: formData.email,
-      // Add other relevant fields from formData as needed
-    };
-
+  const handleSaveVendor = async (serviceTypeCommissions?: ServiceTypeCommission[]) => {
     try {
       setSaving(true);
       
-      // Validate form data
-      if (!formData.name || !formData.contactPerson || !formData.email || !formData.phone) {
-        toast({
-          title: "Missing information",
-          description: "Please fill in all required fields",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Prepare vendor data
-      const vendorData = {
-        name: formData.name,
-        contact_person: formData.contactPerson,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        service_area: formData.serviceArea,
-        commission_rate: formData.commissionRate,
-        price_range: formData.priceRange,
-        notes: formData.notes
-      };
-      
-      let finalVendorId = vendorId;
+      let savedVendorId = vendorId;
       
       if (isNewVendor) {
-        // Insert new vendor
-        const { data: newVendor, error: insertError } = await supabase
+        // Create new vendor
+        const { data: vendorData, error: vendorError } = await supabase
           .from('vendors')
-          .insert(vendorData)
-          .select('id')
+          .insert({
+            name: formData.name,
+            contact_person: formData.contactPerson,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            service_area: formData.serviceArea,
+            commission_rate: formData.commissionRate,
+            price_range: formData.priceRange,
+            notes: formData.notes
+          })
+          .select()
           .single();
         
-        if (insertError) throw insertError;
-        finalVendorId = newVendor.id;
-        
-        // Create service type relationships for new vendor
-        if (serviceTypes.length > 0 && finalVendorId) {
-          await handleServiceTypes(finalVendorId, serviceTypes);
-        }
-        
-        // Create tag relationships for new vendor
-        if (tags.length > 0 && finalVendorId) {
-          await handleTags(finalVendorId, tags);
-        }
+        if (vendorError) throw vendorError;
+        savedVendorId = vendorData.id;
         
         toast({
-          title: "Vendor created",
-          description: `${formData.name} has been added to your vendors`,
+          title: "Success",
+          description: "Vendor created successfully",
+          variant: "default"
         });
-
-        if (currentUser && finalVendorId) {
-          await addAuditLog(currentUser, {
-            action: 'CREATE_VENDOR',
-            resourceType: 'Vendor',
-            resourceId: finalVendorId,
-            details: { vendorData: submittedDataForAudit },
-          });
-        }
         
-        // Navigate to the new vendor's page in view mode
-        navigate(`/vendors/${finalVendorId}`);
-        return;
+        // Navigate to the new vendor's page
+        navigate(`/vendors/${savedVendorId}`);
       } else {
         // Update existing vendor
-        const { error: updateError } = await supabase
+        const { error: vendorError } = await supabase
           .from('vendors')
-          .update(vendorData)
+          .update({
+            name: formData.name,
+            contact_person: formData.contactPerson,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            service_area: formData.serviceArea,
+            commission_rate: formData.commissionRate,
+            price_range: formData.priceRange,
+            notes: formData.notes
+          })
           .eq('id', vendorId);
         
-        if (updateError) throw updateError;
-        
-        // For existing vendors, handle service types and tags
-        if (finalVendorId) {
-          await handleServiceTypes(finalVendorId, serviceTypes);
-          await handleTags(finalVendorId, tags);
-        }
+        if (vendorError) throw vendorError;
         
         toast({
-          title: "Vendor updated",
-          description: "Vendor information has been successfully updated",
+          title: "Success",
+          description: "Vendor updated successfully",
+          variant: "default"
         });
-
-        if (currentUser && vendorId) {
-          // For updates, "oldValues" are not readily available in this hook.
-          // We log the new values. For more detailed old/new comparison,
-          // the component using this hook would need to fetch and pass old data.
-          await addAuditLog(currentUser, {
-            action: 'UPDATE_VENDOR',
-            resourceType: 'Vendor',
-            resourceId: vendorId,
-            details: { newValues: submittedDataForAudit },
-          });
+      }
+      
+      if (savedVendorId) {
+        // Handle service types
+        await supabase.from('vendor_service_types').delete().eq('vendor_id', savedVendorId);
+        
+        if (serviceTypes.length > 0) {
+          const serviceTypeRelations = serviceTypes.map(st => ({
+            vendor_id: savedVendorId,
+            service_type_id: st.id
+          }));
+          
+          const { error: serviceTypesError } = await supabase
+            .from('vendor_service_types')
+            .insert(serviceTypeRelations);
+          
+          if (serviceTypesError) throw serviceTypesError;
+        }
+        
+        // Handle tags
+        await supabase.from('vendor_tags').delete().eq('vendor_id', savedVendorId);
+        
+        if (tags.length > 0) {
+          const tagRelations = tags.map(tag => ({
+            vendor_id: savedVendorId,
+            tag_id: tag.id
+          }));
+          
+          const { error: tagsError } = await supabase
+            .from('vendor_tags')
+            .insert(tagRelations);
+          
+          if (tagsError) throw tagsError;
+        }
+        
+        // Handle service type commissions
+        if (serviceTypeCommissions && serviceTypeCommissions.length > 0) {
+          // Delete existing commissions
+          await supabase
+            .from('vendor_service_type_commissions')
+            .delete()
+            .eq('vendor_id', savedVendorId);
+          
+          // Insert new commissions
+          const commissionsToInsert = serviceTypeCommissions.map(c => ({
+            vendor_id: savedVendorId,
+            service_type_id: c.service_type_id,
+            commission_rate: c.commission_rate
+          }));
+          
+          const { error: commissionsError } = await supabase
+            .from('vendor_service_type_commissions')
+            .insert(commissionsToInsert);
+          
+          if (commissionsError) throw commissionsError;
         }
       }
     } catch (error: any) {
       console.error('Error saving vendor:', error);
       toast({
-        title: "Failed to save vendor",
-        description: error.message,
+        title: "Error",
+        description: `Failed to save vendor: ${error.message}`,
         variant: "destructive"
       });
-      if (currentUser) {
-        await addAuditLog(currentUser, {
-          action: isNewVendor ? 'CREATE_VENDOR_FAILED' : 'UPDATE_VENDOR_FAILED',
-          resourceType: 'Vendor',
-          resourceId: vendorId || null, // vendorId might be undefined for new vendor creation failure before ID generation
-          details: { error: error.message, submittedData: submittedDataForAudit },
-        });
-      }
     } finally {
       setSaving(false);
     }
   };
-
-  // Helper function to handle service types
-  const handleServiceTypes = async (vendorId: string, serviceTypes: ServiceType[]) => {
-    try {
-      // First delete existing service type relationships
-      const { error: deleteError } = await supabase
-        .from('vendor_service_types')
-        .delete()
-        .eq('vendor_id', vendorId);
-        
-      if (deleteError) {
-        console.error('Error deleting existing service types:', deleteError);
-        toast({
-          title: "Warning",
-          description: `Error removing old service types: ${deleteError.message}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Then insert new service type relationships if any exist
-      if (serviceTypes.length > 0) {
-        const serviceTypeRelations = serviceTypes.map(st => ({
-          vendor_id: vendorId,
-          service_type_id: st.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('vendor_service_types')
-          .insert(serviceTypeRelations);
-        
-        if (insertError) {
-          console.error('Error adding service types:', insertError);
-          toast({
-            title: "Warning",
-            description: `Error adding service types: ${insertError.message}`,
-            variant: "destructive"
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error('Error managing vendor service types:', error);
-    }
-  };
-
-  // Helper function to handle tags
-  const handleTags = async (vendorId: string, tags: Tag[]) => {
-    try {
-      // First delete all existing tag relationships
-      const { error: deleteError } = await supabase
-        .from('vendor_tags')
-        .delete()
-        .eq('vendor_id', vendorId);
-        
-      if (deleteError) {
-        console.error('Error deleting existing tags:', deleteError);
-        toast({
-          title: "Warning",
-          description: `Error removing old tags: ${deleteError.message}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Then insert new tag relationships if any exist
-      if (tags.length > 0) {
-        const tagRelations = tags.map(tag => ({
-          vendor_id: vendorId,
-          tag_id: tag.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('vendor_tags')
-          .insert(tagRelations);
-        
-        if (insertError) {
-          console.error('Error adding tags:', insertError);
-          toast({
-            title: "Warning",
-            description: `Error adding tags: ${insertError.message}`,
-            variant: "destructive"
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error('Error managing vendor tags:', error);
-    }
-  };
-
+  
   const handleDeleteVendor = async () => {
-    // Attempt to get vendor name for audit log before deletion, if possible.
-    // This might require an extra fetch if formData isn't guaranteed to be the current vendor's data.
-    // For simplicity, we'll use formData.name if available, otherwise just the ID.
-    const vendorNameToLog = formData?.name || `ID: ${vendorId}`;
-
     try {
       setSaving(true);
       
-      // First delete vendor relationships
-      await supabase.from('vendor_service_types').delete().eq('vendor_id', vendorId);
-      await supabase.from('vendor_tags').delete().eq('vendor_id', vendorId);
-      await supabase.from('vendor_files').delete().eq('vendor_id', vendorId);
-      
-      // Then delete the vendor
-      const { error } = await supabase.from('vendors').delete().eq('id', vendorId);
+      const { error } = await supabase
+        .from('vendors')
+        .delete()
+        .eq('id', vendorId);
       
       if (error) throw error;
       
       toast({
-        title: "Vendor deleted",
-        description: "The vendor has been successfully removed"
+        title: "Success",
+        description: "Vendor deleted successfully",
+        variant: "default"
       });
-
-      if (currentUser && vendorId) {
-        await addAuditLog(currentUser, {
-          action: 'DELETE_VENDOR',
-          resourceType: 'Vendor',
-          resourceId: vendorId,
-          details: { vendorName: vendorNameToLog }, // Log name if available
-        });
-      }
       
       navigate('/vendors');
     } catch (error: any) {
       console.error('Error deleting vendor:', error);
       toast({
-        title: "Failed to delete vendor",
-        description: error.message,
+        title: "Error",
+        description: `Failed to delete vendor: ${error.message}`,
         variant: "destructive"
       });
-      if (currentUser && vendorId) {
-        await addAuditLog(currentUser, {
-          action: 'DELETE_VENDOR_FAILED',
-          resourceType: 'Vendor',
-          resourceId: vendorId,
-          details: { error: error.message, vendorName: vendorNameToLog },
-        });
-      }
     } finally {
       setSaving(false);
       setDeleteDialogOpen(false);

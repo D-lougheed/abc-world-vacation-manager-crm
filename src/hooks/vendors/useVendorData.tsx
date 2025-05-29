@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,11 @@ interface ServiceType {
 interface Tag {
   id: string;
   name: string;
+}
+
+interface ServiceTypeCommission {
+  service_type_id: string;
+  commission_rate: number;
 }
 
 interface Booking {
@@ -56,6 +62,8 @@ interface UseVendorDataReturn {
   bookings: Booking[];
   documents: Document[];
   vendorRating: number;
+  serviceTypeCommissions: ServiceTypeCommission[];
+  setServiceTypeCommissions: React.Dispatch<React.SetStateAction<ServiceTypeCommission[]>>;
 }
 
 const DEFAULT_VENDOR_COMMISSION_KEY = "default_vendor_commission_percentage";
@@ -82,6 +90,7 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [vendorRating, setVendorRating] = useState<number>(0);
+  const [serviceTypeCommissions, setServiceTypeCommissions] = useState<ServiceTypeCommission[]>([]);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -262,6 +271,8 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
     availableTags,
     bookings,
     documents,
-    vendorRating
+    vendorRating,
+    serviceTypeCommissions,
+    setServiceTypeCommissions
   };
 };

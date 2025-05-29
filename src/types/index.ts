@@ -1,3 +1,4 @@
+
 export enum UserRole {
   SuperAdmin = "SuperAdmin",
   Admin = "Admin",
@@ -27,6 +28,15 @@ export interface Client {
   bookings?: Booking[];
 }
 
+export interface VendorServiceTypeCommission {
+  id: string;
+  vendor_id: string;
+  service_type_id: string;
+  commission_rate: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -42,6 +52,7 @@ export interface Vendor {
   tags: Tag[];
   notes?: string;
   files?: string[];
+  serviceTypeCommissions?: VendorServiceTypeCommission[];
 }
 
 export enum TripStatus {

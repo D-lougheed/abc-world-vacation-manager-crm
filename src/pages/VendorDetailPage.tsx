@@ -37,6 +37,7 @@ import VendorForm from "@/components/vendors/VendorForm";
 import VendorInfo from "@/components/vendors/VendorInfo";
 import BookingHistory from "@/components/vendors/BookingHistory"; 
 import DocumentsList from "@/components/vendors/DocumentsList";
+import ServiceTypeCommissions from "@/components/vendors/ServiceTypeCommissions";
 
 // Import custom hooks
 import { useVendorData } from "@/hooks/vendors/useVendorData";
@@ -60,7 +61,9 @@ const VendorDetailPage = () => {
     setTags,
     bookings,
     documents,
-    vendorRating
+    vendorRating,
+    serviceTypeCommissions,
+    setServiceTypeCommissions
   } = useVendorData(id, isNewVendor);
   
   const {
@@ -73,7 +76,7 @@ const VendorDetailPage = () => {
   
   // Handler to save vendor and exit edit mode
   const handleSaveAndExitEditMode = async () => {
-    await handleSaveVendor();
+    await handleSaveVendor(serviceTypeCommissions);
     if (!isNewVendor) {
       setIsEditMode(false);
     }
@@ -153,9 +156,9 @@ const VendorDetailPage = () => {
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: Vendor information */}
-        <Card className="col-span-3 md:col-span-1">
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>{isEditMode ? (isNewVendor ? "Vendor Information" : "Edit Vendor Information") : "Vendor Details"}</CardTitle>
             {isNewVendor && <CardDescription>Add details about this vendor</CardDescription>}
@@ -238,30 +241,42 @@ const VendorDetailPage = () => {
           </CardFooter>
         </Card>
         
-        {/* Right column: Split into two cards - Bookings and Documents */}
-        {!isNewVendor && (
-          <>
-            {/* Bookings Card */}
-            <Card className="col-span-3 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Booking History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BookingHistory bookings={bookings} />
-              </CardContent>
-            </Card>
+        {/* Right column: Commission rates, bookings, and documents */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Service Type Commission Rates */}
+          <ServiceTypeCommissions
+            vendorId={id}
+            isNewVendor={isNewVendor}
+            serviceTypes={serviceTypes}
+            onCommissionsChange={setServiceTypeCommissions}
+            defaultCommissionRate={formData.commissionRate}
+          />
+          
+          {/* Bookings and Documents - only show for existing vendors */}
+          {!isNewVendor && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Bookings Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Booking History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BookingHistory bookings={bookings} />
+                </CardContent>
+              </Card>
 
-            {/* Documents Card */}
-            <Card className="col-span-3 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DocumentsList documents={documents} />
-              </CardContent>
-            </Card>
-          </>
-        )}
+              {/* Documents Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DocumentsList documents={documents} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
