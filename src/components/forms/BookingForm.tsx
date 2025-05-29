@@ -53,13 +53,14 @@ const bookingSchema = z.object({
   bookingStatus: z.enum(["Pending", "Confirmed", "Canceled"]),
   commissionStatus: z.enum(["Unreceived", "Received", "Completed", "Canceled"]),
   billingStatus: z.enum(["Draft", "Awaiting Deposit", "Awaiting Final Payment", "Paid"]).optional(),
-  depositAmount: z.number().optional(),
+  depositAmount: z.number().optional(), // Made optional
   finalPaymentDueDate: z.date().optional(),
   isCompleted: z.boolean().optional(),
-  rating: z.number().min(1).max(5).optional(),
-  clientRating: z.number().min(1).max(5).optional(),
+  rating: z.number().min(1).max(5).optional(), // Made optional
+  clientRating: z.number().min(1).max(5).optional(), // Made optional
   notes: z.string().optional(),
-  subAgent: z.string().optional(),
+  agentId: z.string().min(1, "Agent is required"),
+  subAgent: z.string().optional(), // Made optional
 });
 
 type BookingFormData = z.infer<typeof bookingSchema>;
@@ -126,6 +127,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       billingStatus: BillingStatus.Draft,
       commissionRate: defaultCommissionRate,
       isCompleted: false,
+      agentId: initialData?.agentId || "",
       ...initialData,
     },
   });
@@ -345,7 +347,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         rating: data.rating || null,
         client_rating: data.clientRating || null,
         notes: data.notes || null,
-        agent_id: initialData?.agentId || agents[0]?.id || null,
+        agent_id: data.agentId,
         sub_agent_id: data.subAgent || null,
       };
 
@@ -531,16 +533,24 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                 <CardDescription>Agent information for this booking</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Primary Agent (Read-only) */}
+                {/* Primary Agent (Now editable) */}
                 <div className="space-y-2">
-                  <Label htmlFor="agent">Primary Agent</Label>
-                  <Input
-                    type="text"
-                    id="agent"
-                    value={agentName}
-                    readOnly
-                    className="bg-muted"
-                  />
+                  <Label htmlFor="agentId">Primary Agent *</Label>
+                  <Select value={watch("agentId")} onValueChange={(value) => setValue("agentId", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.first_name} {agent.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.agentId && (
+                    <p className="text-sm text-destructive">{errors.agentId.message}</p>
+                  )}
                 </div>
 
                 {/* Sub-Agent Selection */}
@@ -880,9 +890,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   )}
                 </div>
 
-                {/* Vendor Rating - Always visible */}
+                {/* Vendor Rating - Now optional */}
                 <div className="space-y-2">
-                  <Label htmlFor="rating">Vendor Rating</Label>
+                  <Label htmlFor="rating">Vendor Rating (Optional)</Label>
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -905,9 +915,9 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   )}
                 </div>
 
-                {/* Client Rating - Always visible */}
+                {/* Client Rating - Now optional */}
                 <div className="space-y-2">
-                  <Label htmlFor="clientRating">Client Rating</Label>
+                  <Label htmlFor="clientRating">Client Rating (Optional)</Label>
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
