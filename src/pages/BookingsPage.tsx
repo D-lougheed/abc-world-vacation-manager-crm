@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -263,6 +262,11 @@ const BookingsPage = () => {
     });
   };
 
+  // Handle checkbox change for showing past bookings
+  const handleShowPastBookingsChange = (checked: boolean | "indeterminate") => {
+    setShowPastBookings(checked === true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -284,7 +288,7 @@ const BookingsPage = () => {
         <Checkbox
           id="show-past-bookings"
           checked={showPastBookings}
-          onCheckedChange={setShowPastBookings}
+          onCheckedChange={handleShowPastBookingsChange}
         />
         <label
           htmlFor="show-past-bookings"
