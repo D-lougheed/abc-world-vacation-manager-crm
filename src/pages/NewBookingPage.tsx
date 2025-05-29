@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -64,6 +65,7 @@ const NewBookingPage = () => {
       try {
         setLoading(true);
         console.log("Fetching initial data for booking form");
+        console.log("Trip ID from URL:", tripId);
         
         let initialDataObj: any = {};
         
@@ -87,22 +89,24 @@ const NewBookingPage = () => {
           
           initialDataObj = {
             clients: tripClients?.map(tc => tc.client_id) || [],
-            tripId: tripId,
+            trip: tripId, // Use 'trip' instead of 'tripId' to match the form field
             agentId: tripData?.agent_id || user?.id
           };
+          
+          console.log("Setting trip in initial data:", tripId);
         } 
         // If clientId is provided, use it to populate clients
         else if (clientId) {
           initialDataObj = {
             clients: [clientId],
-            tripId: null,
+            trip: null, // Use 'trip' instead of 'tripId'
             agentId: user?.id  // Always assign current user as agent
           };
         } else {
           // No parameters provided, use current user as agent
           initialDataObj = {
             clients: [], // Initialize with empty array to avoid undefined
-            tripId: null,
+            trip: null, // Use 'trip' instead of 'tripId'
             agentId: user?.id
           };
         }
@@ -115,7 +119,7 @@ const NewBookingPage = () => {
         initialDataObj.depositAmount = null;
         initialDataObj.finalPaymentDueDate = null;
         
-        console.log("Initial data for booking form:", initialDataObj);
+        console.log("Final initial data for booking form:", initialDataObj);
         setInitialData(initialDataObj);
         
       } catch (error: any) {
