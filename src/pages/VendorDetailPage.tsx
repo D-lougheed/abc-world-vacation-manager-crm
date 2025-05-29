@@ -63,7 +63,8 @@ const VendorDetailPage = () => {
     documents,
     vendorRating,
     serviceTypeCommissions,
-    setServiceTypeCommissions
+    setServiceTypeCommissions,
+    defaultCommissionRate
   } = useVendorData(id, isNewVendor);
   
   const {
@@ -185,7 +186,6 @@ const VendorDetailPage = () => {
                 phone={formData.phone}
                 address={formData.address}
                 serviceArea={formData.serviceArea}
-                commissionRate={formData.commissionRate}
                 priceRange={formData.priceRange}
                 serviceTypes={serviceTypes}
                 tags={tags}
@@ -249,7 +249,7 @@ const VendorDetailPage = () => {
             isNewVendor={isNewVendor}
             serviceTypes={serviceTypes}
             onCommissionsChange={setServiceTypeCommissions}
-            defaultCommissionRate={formData.commissionRate}
+            defaultCommissionRate={defaultCommissionRate}
           />
           
           {/* Bookings and Documents - only show for existing vendors */}

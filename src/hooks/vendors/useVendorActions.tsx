@@ -11,7 +11,6 @@ interface VendorFormData {
   phone: string;
   address: string;
   serviceArea: string;
-  commissionRate: number;
   priceRange: number;
   notes?: string;
 }
@@ -68,7 +67,6 @@ export const useVendorActions = (
             phone: formData.phone,
             address: formData.address,
             service_area: formData.serviceArea,
-            commission_rate: formData.commissionRate,
             price_range: formData.priceRange,
             notes: formData.notes
           })
@@ -97,7 +95,6 @@ export const useVendorActions = (
             phone: formData.phone,
             address: formData.address,
             service_area: formData.serviceArea,
-            commission_rate: formData.commissionRate,
             price_range: formData.priceRange,
             notes: formData.notes
           })

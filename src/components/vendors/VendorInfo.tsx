@@ -1,5 +1,5 @@
 
-import { CreditCard, Globe, Mail, MapPin, Phone, Star, Tag } from "lucide-react";
+import { Globe, Mail, MapPin, Phone, Star, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export interface VendorInfoProps {
@@ -9,7 +9,6 @@ export interface VendorInfoProps {
   phone: string;
   address: string;
   serviceArea: string;
-  commissionRate: number;
   priceRange: number;
   serviceTypes: { id: string; name: string; }[];
   tags: { id: string; name: string; }[];
@@ -24,7 +23,6 @@ const VendorInfo = ({
   phone,
   address,
   serviceArea,
-  commissionRate,
   priceRange,
   serviceTypes,
   tags,
@@ -98,10 +96,6 @@ const VendorInfo = ({
         <div className="flex items-center gap-2 mb-3">
           <Globe className="h-4 w-4 text-muted-foreground" />
           <p>{serviceArea}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-primary" />
-          <p className="font-medium">{commissionRate}% Commission Rate</p>
         </div>
       </div>
       

@@ -46,7 +46,6 @@ export interface Vendor {
   address: string;
   serviceTypes: ServiceType[];
   serviceArea: string;
-  commissionRate: number;
   priceRange: number;
   rating: number;
   tags: Tag[];

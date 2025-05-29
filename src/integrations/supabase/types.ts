@@ -721,7 +721,6 @@ export type Database = {
       vendors: {
         Row: {
           address: string
-          commission_rate: number
           contact_person: string
           created_at: string
           email: string
@@ -736,7 +735,6 @@ export type Database = {
         }
         Insert: {
           address: string
-          commission_rate: number
           contact_person: string
           created_at?: string
           email: string
@@ -751,7 +749,6 @@ export type Database = {
         }
         Update: {
           address?: string
-          commission_rate?: number
           contact_person?: string
           created_at?: string
           email?: string

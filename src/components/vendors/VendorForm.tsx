@@ -6,7 +6,6 @@ import {
   Phone,
   MapPin,
   Globe,
-  CreditCard,
   Tag,
   X,
   Save,
@@ -34,7 +33,6 @@ export interface VendorFormData {
   phone: string;
   address: string;
   serviceArea: string;
-  commissionRate: number;
   priceRange: number;
   notes?: string;
 }
@@ -113,22 +111,10 @@ const VendorForm = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
-    if (name === 'commissionRate') {
-      // Parse commission rate as a number
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue) || value === '') {
-        setFormData(prevData => ({
-          ...prevData,
-          [name]: value === '' ? 0 : numValue
-        }));
-      }
-    } else {
-      setFormData(prevData => ({
-        ...prevData,
-        [name]: value
-      }));
-    }
+    setFormData(prevData => ({
+      ...prevData,
+      [name]: value
+    }));
   };
 
   const handlePriceRangeChange = (value: number[]) => {
@@ -274,24 +260,6 @@ const VendorForm = ({
             <div className="text-lg">{renderPriceRange(formData.priceRange)}</div>
             <p className="text-sm text-muted-foreground">{formData.priceRange} / 5</p>
           </div>
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="commissionRate">Commission Rate (%)</Label>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-primary" />
-          <Input 
-            id="commissionRate" 
-            name="commissionRate" 
-            value={formData.commissionRate}
-            onChange={handleInputChange}
-            placeholder="Enter commission rate percentage"
-            type="number"
-            min="0"
-            max="100"
-            step="0.5"
-          />
         </div>
       </div>
 
