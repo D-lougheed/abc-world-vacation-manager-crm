@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -60,6 +59,7 @@ const bookingSchema = z.object({
   rating: z.number().min(1).max(5).optional(),
   clientRating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
+  subAgent: z.string().optional(),
 });
 
 type BookingFormData = z.infer<typeof bookingSchema>;
@@ -346,6 +346,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         client_rating: data.clientRating || null,
         notes: data.notes || null,
         agent_id: initialData?.agentId || agents[0]?.id || null,
+        sub_agent_id: data.subAgent || null,
       };
 
       let booking;
@@ -421,6 +422,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       </div>
     );
   }
+
+  // Find the agent name for display
+  const currentAgent = agents.find(agent => agent.id === initialData?.agentId);
+  const agentName = currentAgent ? `${currentAgent.first_name} ${currentAgent.last_name}` : "Not assigned";
 
   return (
     <div className="space-y-6">
@@ -515,6 +520,47 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Booking Agent Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Booking Agent</CardTitle>
+                <CardDescription>Agent information for this booking</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Primary Agent (Read-only) */}
+                <div className="space-y-2">
+                  <Label htmlFor="agent">Primary Agent</Label>
+                  <Input
+                    type="text"
+                    id="agent"
+                    value={agentName}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+
+                {/* Sub-Agent Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="subAgent">Sub-Agent</Label>
+                  <Select value={watch("subAgent")} onValueChange={(value) => setValue("subAgent", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a sub-agent (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.first_name} {agent.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.subAgent && (
+                    <p className="text-sm text-destructive">{errors.subAgent.message}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

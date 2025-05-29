@@ -65,6 +65,7 @@ const EditBookingPage = () => {
           clientRating: data.client_rating,
           agentId: data.agent_id,
           tripId: data.trip_id,
+          subAgent: data.sub_agent_id,
           // Add new billing fields
           billingStatus: data.billing_status as BillingStatus || BillingStatus.Draft,
           depositAmount: data.deposit_amount,

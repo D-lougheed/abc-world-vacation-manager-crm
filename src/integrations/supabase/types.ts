@@ -162,6 +162,7 @@ export type Database = {
           service_type_id: string
           start_date: string
           start_time: string | null
+          sub_agent_id: string | null
           trip_id: string | null
           updated_at: string
           vendor_id: string
@@ -190,6 +191,7 @@ export type Database = {
           service_type_id: string
           start_date: string
           start_time?: string | null
+          sub_agent_id?: string | null
           trip_id?: string | null
           updated_at?: string
           vendor_id: string
@@ -218,6 +220,7 @@ export type Database = {
           service_type_id?: string
           start_date?: string
           start_time?: string | null
+          sub_agent_id?: string | null
           trip_id?: string | null
           updated_at?: string
           vendor_id?: string
@@ -235,6 +238,13 @@ export type Database = {
             columns: ["service_type_id"]
             isOneToOne: false
             referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_sub_agent_id_fkey"
+            columns: ["sub_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
