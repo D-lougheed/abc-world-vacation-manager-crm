@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -101,6 +102,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [filteredServiceTypes, setFilteredServiceTypes] = useState<ServiceType[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(10);
 
@@ -151,12 +153,24 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     });
   };
 
-  // Update commission rate when vendor or service type changes
+  // Filter service types when vendor changes
+  useEffect(() => {
+    if (watchedVendor) {
+      fetchVendorServiceTypes(watchedVendor);
+      fetchCommissionRate(watchedVendor, watchedServiceType);
+    } else {
+      setFilteredServiceTypes([]);
+      // Clear service type if vendor is cleared
+      setValue("serviceType", "");
+    }
+  }, [watchedVendor]);
+
+  // Update commission rate when service type changes (if vendor is already selected)
   useEffect(() => {
     if (watchedVendor && watchedServiceType) {
       fetchCommissionRate(watchedVendor, watchedServiceType);
     }
-  }, [watchedVendor, watchedServiceType]);
+  }, [watchedServiceType]);
 
   const fetchFormData = async () => {
     try {
@@ -196,6 +210,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       setTrips(tripsResult.data || []);
       setServiceTypes(serviceTypesResult.data || []);
       setAgents(agentsResult.data || []);
+
+      // If editing and vendor is already selected, fetch service types for that vendor
+      if (initialData?.vendor) {
+        fetchVendorServiceTypes(initialData.vendor);
+      }
     } catch (error: any) {
       console.error("Error fetching form data:", error);
       toast({
@@ -208,7 +227,45 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     }
   };
 
+  const fetchVendorServiceTypes = async (vendorId: string) => {
+    try {
+      // Get service types for the selected vendor
+      const { data: vendorServiceTypes, error } = await supabase
+        .from("vendor_service_types")
+        .select(`
+          service_type_id,
+          service_types (id, name)
+        `)
+        .eq("vendor_id", vendorId);
+
+      if (error) {
+        console.error("Error fetching vendor service types:", error);
+        setFilteredServiceTypes([]);
+        return;
+      }
+
+      // Extract service types from the junction table result
+      const availableServiceTypes = vendorServiceTypes
+        ?.map(vst => vst.service_types)
+        .filter(Boolean) || [];
+
+      setFilteredServiceTypes(availableServiceTypes as ServiceType[]);
+
+      // If current service type is not available for this vendor, clear it
+      const currentServiceType = watchedServiceType;
+      if (currentServiceType && !availableServiceTypes.some(st => st?.id === currentServiceType)) {
+        setValue("serviceType", "");
+      }
+
+    } catch (error: any) {
+      console.error("Error fetching vendor service types:", error);
+      setFilteredServiceTypes([]);
+    }
+  };
+
   const fetchCommissionRate = async (vendorId: string, serviceTypeId: string) => {
+    if (!serviceTypeId) return;
+
     try {
       // First try to get service-type-specific commission rate
       const { data: commissionData, error: commissionError } = await supabase
@@ -362,388 +419,399 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Booking Details</CardTitle>
-            <CardDescription>Enter the basic information for this booking</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Client Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="clients">Clients *</Label>
-              <MultiSelect
-                options={clients.map(client => ({
-                  value: client.id,
-                  label: `${client.first_name} ${client.last_name}`,
-                }))}
-                selected={watch("clients") || []}
-                onChange={(values) => setValue("clients", values)}
-                placeholder="Select clients..."
-              />
-              {errors.clients && (
-                <p className="text-sm text-destructive">{errors.clients.message}</p>
-              )}
-            </div>
-
-            {/* Vendor Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="vendor">Vendor *</Label>
-              <Select value={watch("vendor")} onValueChange={(value) => setValue("vendor", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.vendor && (
-                <p className="text-sm text-destructive">{errors.vendor.message}</p>
-              )}
-            </div>
-
-            {/* Trip Selection (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="trip">Associated Trip</Label>
-              <Select value={watch("trip")} onValueChange={(value) => setValue("trip", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a trip (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trips.map((trip) => (
-                    <SelectItem key={trip.id} value={trip.id}>
-                      {trip.name} ({format(new Date(trip.start_date), "MMM dd")} - {format(new Date(trip.end_date), "MMM dd, yyyy")})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Service Type Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="serviceType">Service Type *</Label>
-              <Select value={watch("serviceType")} onValueChange={(value) => setValue("serviceType", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a service type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {serviceTypes.map((serviceType) => (
-                    <SelectItem key={serviceType.id} value={serviceType.id}>
-                      {serviceType.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.serviceType && (
-                <p className="text-sm text-destructive">{errors.serviceType.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Date & Time</CardTitle>
-            <CardDescription>Set the date and time for this booking</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[280px] justify-start text-left font-normal",
-                      !watch("startDate") && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {watch("startDate") ? (
-                      format(watch("startDate"), "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={watch("startDate")}
-                    onSelect={(date) => setValue("startDate", date)}
-                    disabled={(date) =>
-                      date > new Date()
-                    }
-                    initialFocus
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - User Input Details */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Booking Details</CardTitle>
+                <CardDescription>Enter the basic information for this booking</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Client Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="clients">Clients *</Label>
+                  <MultiSelect
+                    options={clients.map(client => ({
+                      value: client.id,
+                      label: `${client.first_name} ${client.last_name}`,
+                    }))}
+                    selected={watch("clients") || []}
+                    onChange={(values) => setValue("clients", values)}
+                    placeholder="Select clients..."
                   />
-                </PopoverContent>
-              </Popover>
-              {errors.startDate && (
-                <p className="text-sm text-destructive">{errors.startDate.message}</p>
-              )}
-            </div>
+                  {errors.clients && (
+                    <p className="text-sm text-destructive">{errors.clients.message}</p>
+                  )}
+                </div>
 
-            {/* Start Time (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="startTime">Start Time (Optional)</Label>
-              <Input
-                type="time"
-                id="startTime"
-                {...register("startTime")}
-              />
-            </div>
+                {/* Vendor Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="vendor">Vendor *</Label>
+                  <Select value={watch("vendor")} onValueChange={(value) => setValue("vendor", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.vendor && (
+                    <p className="text-sm text-destructive">{errors.vendor.message}</p>
+                  )}
+                </div>
 
-            {/* End Date (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="endDate">End Date (Optional)</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[280px] justify-start text-left font-normal",
-                      !watch("endDate") && "text-muted-foreground"
-                    )}
+                {/* Service Type Selection - Filtered by Vendor */}
+                <div className="space-y-2">
+                  <Label htmlFor="serviceType">Service Type *</Label>
+                  <Select 
+                    value={watch("serviceType")} 
+                    onValueChange={(value) => setValue("serviceType", value)}
+                    disabled={!watchedVendor}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {watch("endDate") ? (
-                      format(watch("endDate"), "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={watch("endDate")}
-                    onSelect={(date) => setValue("endDate", date)}
-                    disabled={(date) =>
-                      date < watch("startDate")!
-                    }
-                    initialFocus
+                    <SelectTrigger>
+                      <SelectValue placeholder={watchedVendor ? "Select a service type" : "Select a vendor first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredServiceTypes.map((serviceType) => (
+                        <SelectItem key={serviceType.id} value={serviceType.id}>
+                          {serviceType.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.serviceType && (
+                    <p className="text-sm text-destructive">{errors.serviceType.message}</p>
+                  )}
+                </div>
+
+                {/* Trip Selection (Optional) */}
+                <div className="space-y-2">
+                  <Label htmlFor="trip">Associated Trip</Label>
+                  <Select value={watch("trip")} onValueChange={(value) => setValue("trip", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a trip (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trips.map((trip) => (
+                        <SelectItem key={trip.id} value={trip.id}>
+                          {trip.name} ({format(new Date(trip.start_date), "MMM dd")} - {format(new Date(trip.end_date), "MMM dd, yyyy")})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Date & Time</CardTitle>
+                <CardDescription>Set the date and time for this booking</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                {/* Start Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !watch("startDate") && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {watch("startDate") ? (
+                          format(watch("startDate"), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={watch("startDate")}
+                        onSelect={(date) => setValue("startDate", date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.startDate && (
+                    <p className="text-sm text-destructive">{errors.startDate.message}</p>
+                  )}
+                </div>
+
+                {/* Start Time (Optional) */}
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Start Time</Label>
+                  <Input
+                    type="time"
+                    id="startTime"
+                    {...register("startTime")}
                   />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
 
-            {/* End Time (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="endTime">End Time (Optional)</Label>
-              <Input
-                type="time"
-                id="endTime"
-                {...register("endTime")}
-              />
-            </div>
-          </CardContent>
-        </Card>
+                {/* End Date (Optional) */}
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !watch("endDate") && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {watch("endDate") ? (
+                          format(watch("endDate"), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={watch("endDate")}
+                        onSelect={(date) => setValue("endDate", date)}
+                        disabled={(date) =>
+                          watch("startDate") && date < watch("startDate")!
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Location</CardTitle>
-            <CardDescription>Where will this service be provided?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Location */}
-            <div className="space-y-2">
-              <Label htmlFor="location">Location *</Label>
-              <Input
-                type="text"
-                id="location"
-                placeholder="Enter the location"
-                {...register("location")}
-              />
-              {errors.location && (
-                <p className="text-sm text-destructive">{errors.location.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Cost & Commission</CardTitle>
-            <CardDescription>Set the financial details for this booking</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            {/* Cost */}
-            <div className="space-y-2">
-              <Label htmlFor="cost">Cost *</Label>
-              <Input
-                type="number"
-                id="cost"
-                placeholder="0.00"
-                {...register("cost", { valueAsNumber: true })}
-              />
-              {errors.cost && (
-                <p className="text-sm text-destructive">{errors.cost.message}</p>
-              )}
-            </div>
-
-            {/* Commission Rate */}
-            <div className="space-y-2">
-              <Label htmlFor="commissionRate">Commission Rate (%) *</Label>
-              <Input
-                type="number"
-                id="commissionRate"
-                placeholder="0"
-                {...register("commissionRate", { valueAsNumber: true })}
-              />
-              {errors.commissionRate && (
-                <p className="text-sm text-destructive">{errors.commissionRate.message}</p>
-              )}
-            </div>
-
-            {/* Commission Amount (Read-only) */}
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="commissionAmount">Commission Amount</Label>
-              <Input
-                type="text"
-                id="commissionAmount"
-                value={commissionAmount.toFixed(2)}
-                readOnly
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Booking Status</CardTitle>
-            <CardDescription>Update the status of this booking</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Booking Status */}
-            <div className="space-y-2">
-              <Label htmlFor="bookingStatus">Booking Status *</Label>
-              <Select value={watch("bookingStatus")} onValueChange={(value) => setValue("bookingStatus", value as BookingStatus)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={BookingStatus.Pending}>Pending</SelectItem>
-                  <SelectItem value={BookingStatus.Confirmed}>Confirmed</SelectItem>
-                  <SelectItem value={BookingStatus.Canceled}>Canceled</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.bookingStatus && (
-                <p className="text-sm text-destructive">{errors.bookingStatus.message}</p>
-              )}
-            </div>
-
-            {/* Commission Status */}
-            <div className="space-y-2">
-              <Label htmlFor="commissionStatus">Commission Status *</Label>
-              <Select value={watch("commissionStatus")} onValueChange={(value) => setValue("commissionStatus", value as CommissionStatus)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={CommissionStatus.Unreceived}>Unreceived</SelectItem>
-                  <SelectItem value={CommissionStatus.Received}>Received</SelectItem>
-                  <SelectItem value={CommissionStatus.Completed}>Completed</SelectItem>
-                  <SelectItem value={CommissionStatus.Canceled}>Canceled</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.commissionStatus && (
-                <p className="text-sm text-destructive">{errors.commissionStatus.message}</p>
-              )}
-            </div>
-
-            {/* Billing Status (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="billingStatus">Billing Status (Optional)</Label>
-              <Select value={watch("billingStatus")} onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={BillingStatus.Draft}>Draft</SelectItem>
-                  <SelectItem value={BillingStatus.AwaitingDeposit}>Awaiting Deposit</SelectItem>
-                  <SelectItem value={BillingStatus.AwaitingFinalPayment}>Awaiting Final Payment</SelectItem>
-                  <SelectItem value={BillingStatus.Paid}>Paid</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.billingStatus && (
-                <p className="text-sm text-destructive">{errors.billingStatus.message}</p>
-              )}
-            </div>
-
-            {/* Deposit Amount (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="depositAmount">Deposit Amount (Optional)</Label>
-              <Input
-                type="number"
-                id="depositAmount"
-                placeholder="0.00"
-                {...register("depositAmount", { valueAsNumber: true })}
-              />
-              {errors.depositAmount && (
-                <p className="text-sm text-destructive">{errors.depositAmount.message}</p>
-              )}
-            </div>
-
-            {/* Final Payment Due Date (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="finalPaymentDueDate">Final Payment Due Date (Optional)</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[280px] justify-start text-left font-normal",
-                      !watch("finalPaymentDueDate") && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {watch("finalPaymentDueDate") ? (
-                      format(watch("finalPaymentDueDate"), "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={watch("finalPaymentDueDate")}
-                    onSelect={(date) => setValue("finalPaymentDueDate", date)}
-                    disabled={(date) =>
-                      date < new Date()
-                    }
-                    initialFocus
+                {/* End Time (Optional) */}
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">End Time</Label>
+                  <Input
+                    type="time"
+                    id="endTime"
+                    {...register("endTime")}
                   />
-                </PopoverContent>
-              </Popover>
-              {errors.finalPaymentDueDate && (
-                <p className="text-sm text-destructive">{errors.finalPaymentDueDate.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Additional Notes</CardTitle>
-            <CardDescription>Any extra details to note about this booking?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Additional notes for this booking..."
-                {...register("notes")}
-              />
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Location & Details</CardTitle>
+                <CardDescription>Additional booking information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Location */}
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location *</Label>
+                  <Input
+                    type="text"
+                    id="location"
+                    placeholder="Enter the location"
+                    {...register("location")}
+                  />
+                  {errors.location && (
+                    <p className="text-sm text-destructive">{errors.location.message}</p>
+                  )}
+                </div>
+
+                {/* Cost */}
+                <div className="space-y-2">
+                  <Label htmlFor="cost">Cost *</Label>
+                  <Input
+                    type="number"
+                    id="cost"
+                    placeholder="0.00"
+                    {...register("cost", { valueAsNumber: true })}
+                  />
+                  {errors.cost && (
+                    <p className="text-sm text-destructive">{errors.cost.message}</p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Additional notes for this booking..."
+                    {...register("notes")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column - Commission & Status */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Commission Details</CardTitle>
+                <CardDescription>Financial details and commission</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Commission Rate */}
+                <div className="space-y-2">
+                  <Label htmlFor="commissionRate">Commission Rate (%)</Label>
+                  <Input
+                    type="number"
+                    id="commissionRate"
+                    placeholder="0"
+                    {...register("commissionRate", { valueAsNumber: true })}
+                  />
+                  {errors.commissionRate && (
+                    <p className="text-sm text-destructive">{errors.commissionRate.message}</p>
+                  )}
+                </div>
+
+                {/* Commission Amount (Read-only) */}
+                <div className="space-y-2">
+                  <Label htmlFor="commissionAmount">Commission Amount</Label>
+                  <Input
+                    type="text"
+                    id="commissionAmount"
+                    value={`$${commissionAmount.toFixed(2)}`}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Status Management</CardTitle>
+                <CardDescription>Update booking and commission status</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Booking Status */}
+                <div className="space-y-2">
+                  <Label htmlFor="bookingStatus">Booking Status</Label>
+                  <Select value={watch("bookingStatus")} onValueChange={(value) => setValue("bookingStatus", value as BookingStatus)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BookingStatus.Pending}>Pending</SelectItem>
+                      <SelectItem value={BookingStatus.Confirmed}>Confirmed</SelectItem>
+                      <SelectItem value={BookingStatus.Canceled}>Canceled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.bookingStatus && (
+                    <p className="text-sm text-destructive">{errors.bookingStatus.message}</p>
+                  )}
+                </div>
+
+                {/* Commission Status */}
+                <div className="space-y-2">
+                  <Label htmlFor="commissionStatus">Commission Status</Label>
+                  <Select value={watch("commissionStatus")} onValueChange={(value) => setValue("commissionStatus", value as CommissionStatus)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={CommissionStatus.Unreceived}>Unreceived</SelectItem>
+                      <SelectItem value={CommissionStatus.Received}>Received</SelectItem>
+                      <SelectItem value={CommissionStatus.Completed}>Completed</SelectItem>
+                      <SelectItem value={CommissionStatus.Canceled}>Canceled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.commissionStatus && (
+                    <p className="text-sm text-destructive">{errors.commissionStatus.message}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Billing Information</CardTitle>
+                <CardDescription>Payment and billing details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Billing Status */}
+                <div className="space-y-2">
+                  <Label htmlFor="billingStatus">Billing Status</Label>
+                  <Select value={watch("billingStatus")} onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BillingStatus.Draft}>Draft</SelectItem>
+                      <SelectItem value={BillingStatus.AwaitingDeposit}>Awaiting Deposit</SelectItem>
+                      <SelectItem value={BillingStatus.AwaitingFinalPayment}>Awaiting Final Payment</SelectItem>
+                      <SelectItem value={BillingStatus.Paid}>Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.billingStatus && (
+                    <p className="text-sm text-destructive">{errors.billingStatus.message}</p>
+                  )}
+                </div>
+
+                {/* Deposit Amount */}
+                <div className="space-y-2">
+                  <Label htmlFor="depositAmount">Deposit Amount</Label>
+                  <Input
+                    type="number"
+                    id="depositAmount"
+                    placeholder="0.00"
+                    {...register("depositAmount", { valueAsNumber: true })}
+                  />
+                  {errors.depositAmount && (
+                    <p className="text-sm text-destructive">{errors.depositAmount.message}</p>
+                  )}
+                </div>
+
+                {/* Final Payment Due Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="finalPaymentDueDate">Final Payment Due Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !watch("finalPaymentDueDate") && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {watch("finalPaymentDueDate") ? (
+                          format(watch("finalPaymentDueDate"), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={watch("finalPaymentDueDate")}
+                        onSelect={(date) => setValue("finalPaymentDueDate", date)}
+                        disabled={(date) =>
+                          date < new Date()
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.finalPaymentDueDate && (
+                    <p className="text-sm text-destructive">{errors.finalPaymentDueDate.message}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={() => navigate("/bookings")}>
