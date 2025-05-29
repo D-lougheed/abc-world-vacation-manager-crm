@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { BookingStatus, CommissionStatus, BillingStatus } from "@/types";
-import MultiSelect from "./MultiSelect";
+import { MultiSelect } from "./MultiSelect";
 
 const bookingSchema = z.object({
   clients: z.array(z.string()).min(1, "At least one client is required"),
@@ -88,7 +88,12 @@ interface Agent {
   last_name: string;
 }
 
-const BookingForm = () => {
+interface BookingFormProps {
+  initialData?: any;
+  bookingId?: string;
+}
+
+const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -98,6 +103,8 @@ const BookingForm = () => {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(10);
+
+  const isEditing = !!bookingId;
 
   const {
     register,
@@ -112,6 +119,7 @@ const BookingForm = () => {
       commissionStatus: CommissionStatus.Unreceived,
       billingStatus: BillingStatus.Draft,
       commissionRate: defaultCommissionRate,
+      ...initialData,
     },
   });
 
@@ -127,7 +135,21 @@ const BookingForm = () => {
 
   useEffect(() => {
     fetchFormData();
+    if (initialData) {
+      populateFormWithInitialData();
+    }
   }, []);
+
+  const populateFormWithInitialData = () => {
+    if (!initialData) return;
+
+    // Set form values from initial data
+    Object.keys(initialData).forEach((key) => {
+      if (initialData[key] !== undefined) {
+        setValue(key as keyof BookingFormData, initialData[key]);
+      }
+    });
+  };
 
   // Update commission rate when vendor or service type changes
   useEffect(() => {
@@ -150,7 +172,9 @@ const BookingForm = () => {
       if (commissionSetting?.value) {
         const rate = parseFloat(commissionSetting.value);
         setDefaultCommissionRate(rate);
-        setValue("commissionRate", rate);
+        if (!initialData?.commissionRate) {
+          setValue("commissionRate", rate);
+        }
       }
 
       const [clientsResult, vendorsResult, tripsResult, serviceTypesResult, agentsResult] = await Promise.all([
@@ -219,14 +243,31 @@ const BookingForm = () => {
       // Calculate commission amount
       const calculatedCommissionAmount = (data.cost * data.commissionRate) / 100;
 
+      // Convert time format from 12hr to 24hr for database storage
+      const convertTo24HourFormat = (time12: string): string | null => {
+        if (!time12) return null;
+        
+        const [time, period] = time12.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours);
+        
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+        
+        return `${hour24.toString().padStart(2, '0')}:${minutes}:00`;
+      };
+
       const bookingData = {
         vendor_id: data.vendor,
         trip_id: data.trip || null,
         service_type_id: data.serviceType,
         start_date: format(data.startDate, "yyyy-MM-dd"),
-        start_time: data.startTime || null,
+        start_time: convertTo24HourFormat(data.startTime || ""),
         end_date: data.endDate ? format(data.endDate, "yyyy-MM-dd") : null,
-        end_time: data.endTime || null,
+        end_time: convertTo24HourFormat(data.endTime || ""),
         location: data.location,
         cost: data.cost,
         commission_rate: data.commissionRate,
@@ -237,16 +278,40 @@ const BookingForm = () => {
         deposit_amount: data.depositAmount || null,
         final_payment_due_date: data.finalPaymentDueDate ? format(data.finalPaymentDueDate, "yyyy-MM-dd") : null,
         notes: data.notes || null,
-        agent_id: agents[0]?.id || null, // For now, assign to first agent
+        agent_id: initialData?.agentId || agents[0]?.id || null,
       };
 
-      const { data: booking, error: bookingError } = await supabase
-        .from("bookings")
-        .insert(bookingData)
-        .select()
-        .single();
+      let booking;
+      if (isEditing) {
+        // Update existing booking
+        const { data: updatedBooking, error: bookingError } = await supabase
+          .from("bookings")
+          .update(bookingData)
+          .eq("id", bookingId)
+          .select()
+          .single();
 
-      if (bookingError) throw bookingError;
+        if (bookingError) throw bookingError;
+        booking = updatedBooking;
+
+        // Update client relationships - first delete existing, then insert new
+        const { error: deleteError } = await supabase
+          .from("booking_clients")
+          .delete()
+          .eq("booking_id", bookingId);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Create new booking
+        const { data: newBooking, error: bookingError } = await supabase
+          .from("bookings")
+          .insert(bookingData)
+          .select()
+          .single();
+
+        if (bookingError) throw bookingError;
+        booking = newBooking;
+      }
 
       // Insert client relationships
       if (data.clients.length > 0) {
@@ -263,15 +328,17 @@ const BookingForm = () => {
       }
 
       toast({
-        title: "Booking created successfully",
-        description: "The booking has been saved and is ready for processing.",
+        title: isEditing ? "Booking updated successfully" : "Booking created successfully",
+        description: isEditing 
+          ? "The booking has been updated and is ready for processing."
+          : "The booking has been saved and is ready for processing.",
       });
 
       navigate("/bookings");
     } catch (error: any) {
-      console.error("Error creating booking:", error);
+      console.error("Error saving booking:", error);
       toast({
-        title: "Error creating booking",
+        title: isEditing ? "Error updating booking" : "Error creating booking",
         description: error.message,
         variant: "destructive",
       });
@@ -291,7 +358,7 @@ const BookingForm = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Create New Booking</h1>
+        <h1 className="text-3xl font-bold">{isEditing ? "Edit Booking" : "Create New Booking"}</h1>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -309,7 +376,8 @@ const BookingForm = () => {
                   value: client.id,
                   label: `${client.first_name} ${client.last_name}`,
                 }))}
-                onValueChange={(values) => setValue("clients", values)}
+                selected={watch("clients") || []}
+                onChange={(values) => setValue("clients", values)}
                 placeholder="Select clients..."
               />
               {errors.clients && (
@@ -320,7 +388,7 @@ const BookingForm = () => {
             {/* Vendor Selection */}
             <div className="space-y-2">
               <Label htmlFor="vendor">Vendor *</Label>
-              <Select onValueChange={(value) => setValue("vendor", value)}>
+              <Select value={watch("vendor")} onValueChange={(value) => setValue("vendor", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a vendor" />
                 </SelectTrigger>
@@ -340,7 +408,7 @@ const BookingForm = () => {
             {/* Trip Selection (Optional) */}
             <div className="space-y-2">
               <Label htmlFor="trip">Associated Trip</Label>
-              <Select onValueChange={(value) => setValue("trip", value)}>
+              <Select value={watch("trip")} onValueChange={(value) => setValue("trip", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a trip (optional)" />
                 </SelectTrigger>
@@ -357,7 +425,7 @@ const BookingForm = () => {
             {/* Service Type Selection */}
             <div className="space-y-2">
               <Label htmlFor="serviceType">Service Type *</Label>
-              <Select onValueChange={(value) => setValue("serviceType", value)}>
+              <Select value={watch("serviceType")} onValueChange={(value) => setValue("serviceType", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a service type" />
                 </SelectTrigger>
@@ -553,7 +621,7 @@ const BookingForm = () => {
             {/* Booking Status */}
             <div className="space-y-2">
               <Label htmlFor="bookingStatus">Booking Status *</Label>
-              <Select onValueChange={(value) => setValue("bookingStatus", value as BookingStatus)}>
+              <Select value={watch("bookingStatus")} onValueChange={(value) => setValue("bookingStatus", value as BookingStatus)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a status" />
                 </SelectTrigger>
@@ -571,7 +639,7 @@ const BookingForm = () => {
             {/* Commission Status */}
             <div className="space-y-2">
               <Label htmlFor="commissionStatus">Commission Status *</Label>
-              <Select onValueChange={(value) => setValue("commissionStatus", value as CommissionStatus)}>
+              <Select value={watch("commissionStatus")} onValueChange={(value) => setValue("commissionStatus", value as CommissionStatus)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a status" />
                 </SelectTrigger>
@@ -590,7 +658,7 @@ const BookingForm = () => {
             {/* Billing Status (Optional) */}
             <div className="space-y-2">
               <Label htmlFor="billingStatus">Billing Status (Optional)</Label>
-              <Select onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
+              <Select value={watch("billingStatus")} onValueChange={(value) => setValue("billingStatus", value as BillingStatus)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a status" />
                 </SelectTrigger>
@@ -682,7 +750,7 @@ const BookingForm = () => {
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create Booking"}
+            {loading ? (isEditing ? "Updating..." : "Creating...") : (isEditing ? "Update Booking" : "Create Booking")}
           </Button>
         </div>
       </form>
