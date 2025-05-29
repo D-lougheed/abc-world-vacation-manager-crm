@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import BookingFilters from "@/components/bookings/BookingFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -16,6 +17,7 @@ import { UserRole, BookingStatus } from "@/types";
 const BookingsPage = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPastBookings, setShowPastBookings] = useState(false);
   const [filters, setFilters] = useState({
     status: "all",
     dateRange: "all",
@@ -203,6 +205,15 @@ const BookingsPage = () => {
             });
           }
         }
+
+        // Filter out past bookings by default unless showPastBookings is true
+        if (!showPastBookings) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0); // Set to start of today
+          filteredBookings = filteredBookings.filter(booking => {
+            return new Date(booking.start_date) >= now;
+          });
+        }
         
         setBookings(filteredBookings);
       } catch (error: any) {
@@ -218,7 +229,7 @@ const BookingsPage = () => {
     };
 
     fetchBookings();
-  }, [filters, toast, user, isAdmin]);
+  }, [filters, showPastBookings, toast, user, isAdmin]);
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -268,6 +279,20 @@ const BookingsPage = () => {
       <Separator />
       
       <BookingFilters serviceTypes={serviceTypes} onFilterChange={handleFilterChange} />
+      
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="show-past-bookings"
+          checked={showPastBookings}
+          onCheckedChange={setShowPastBookings}
+        />
+        <label
+          htmlFor="show-past-bookings"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
+          Show past bookings
+        </label>
+      </div>
       
       <Tabs defaultValue="list" className="mt-2">
         <TabsList>
