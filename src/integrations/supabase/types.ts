@@ -144,6 +144,7 @@ export type Database = {
             | Database["public"]["Enums"]["billing_status_enum"]
             | null
           booking_status: Database["public"]["Enums"]["booking_status"]
+          client_rating: number | null
           commission_amount: number
           commission_rate: number
           commission_status: Database["public"]["Enums"]["commission_status"]
@@ -171,6 +172,7 @@ export type Database = {
             | Database["public"]["Enums"]["billing_status_enum"]
             | null
           booking_status?: Database["public"]["Enums"]["booking_status"]
+          client_rating?: number | null
           commission_amount: number
           commission_rate: number
           commission_status?: Database["public"]["Enums"]["commission_status"]
@@ -198,6 +200,7 @@ export type Database = {
             | Database["public"]["Enums"]["billing_status_enum"]
             | null
           booking_status?: Database["public"]["Enums"]["booking_status"]
+          client_rating?: number | null
           commission_amount?: number
           commission_rate?: number
           commission_status?: Database["public"]["Enums"]["commission_status"]

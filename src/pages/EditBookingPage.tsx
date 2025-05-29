@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { BillingStatus } from "@/types"; // Import BillingStatus
+import { BillingStatus } from "@/types";
 
 const EditBookingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,7 +64,7 @@ const EditBookingPage = () => {
           rating: data.rating,
           clientRating: data.client_rating,
           agentId: data.agent_id,
-          tripId: data.trip_id, // Preserve as null if it's null
+          tripId: data.trip_id,
           // Add new billing fields
           billingStatus: data.billing_status as BillingStatus || BillingStatus.Draft,
           depositAmount: data.deposit_amount,
