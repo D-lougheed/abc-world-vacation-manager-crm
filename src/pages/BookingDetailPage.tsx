@@ -124,22 +124,35 @@ const BookingDetailPage = () => {
           clients = clientsData || [];
         }
         
-        // Fetch vendor data
+        // Fetch vendor data without commission_rate
         let vendor: VendorType = { name: "Unknown Vendor", commissionRate: 0, serviceTypes: [] };
         if (bookingData.vendor_id) {
           const { data: vendorData, error: vendorError } = await supabase
             .from('vendors')
-            .select('id, name, commission_rate')
+            .select('id, name')
             .eq('id', bookingData.vendor_id)
             .single();
           
           if (vendorError) {
             console.error("Error fetching vendor:", vendorError);
           } else if (vendorData) {
+            // Get commission rate from vendor_service_type_commissions table
+            let commissionRate = 0;
+            const { data: commissionData, error: commissionError } = await supabase
+              .from('vendor_service_type_commissions')
+              .select('commission_rate')
+              .eq('vendor_id', vendorData.id)
+              .eq('service_type_id', bookingData.service_type_id)
+              .maybeSingle();
+            
+            if (!commissionError && commissionData) {
+              commissionRate = commissionData.commission_rate;
+            }
+            
             vendor = {
               id: vendorData.id,
               name: vendorData.name,
-              commissionRate: vendorData.commission_rate,
+              commissionRate: commissionRate,
               serviceTypes: []
             };
             

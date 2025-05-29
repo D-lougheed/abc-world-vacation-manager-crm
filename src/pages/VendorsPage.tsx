@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -83,7 +82,7 @@ const VendorsPage = () => {
         setServiceTypesList(serviceTypesResponse.data || []);
         setTagsList(tagsResponse.data || []);
         
-        // Fetch vendors
+        // Fetch vendors without commission_rate
         const { data: vendorsData, error: vendorsError } = await supabase
           .from('vendors')
           .select('*')
@@ -91,7 +90,7 @@ const VendorsPage = () => {
         
         if (vendorsError) throw vendorsError;
         
-        // For each vendor, fetch associated service types and tags
+        // For each vendor, fetch associated service types, tags, and calculate average commission rate
         const vendorsWithDetails = await Promise.all((vendorsData || []).map(async (vendor) => {
           // Fetch service types for this vendor
           const { data: vendorServiceTypes, error: vendorServiceTypesError } = await supabase
@@ -133,6 +132,18 @@ const VendorsPage = () => {
             tags = tagsData ? tagsData.map(tag => tag.name) : [];
           }
           
+          // Calculate average commission rate for this vendor
+          let avgCommissionRate = 0;
+          const { data: commissionRates, error: commissionError } = await supabase
+            .from('vendor_service_type_commissions')
+            .select('commission_rate')
+            .eq('vendor_id', vendor.id);
+          
+          if (!commissionError && commissionRates && commissionRates.length > 0) {
+            const totalRate = commissionRates.reduce((sum, item) => sum + item.commission_rate, 0);
+            avgCommissionRate = totalRate / commissionRates.length;
+          }
+          
           return {
             id: vendor.id,
             name: vendor.name,
@@ -140,7 +151,7 @@ const VendorsPage = () => {
             serviceTypes,
             tags,
             priceRange: vendor.price_range,
-            commissionRate: vendor.commission_rate,
+            commissionRate: avgCommissionRate,
             rating: vendor.rating || 0,
             email: vendor.email,
             phone: vendor.phone,
@@ -282,7 +293,7 @@ const VendorsPage = () => {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Service Types</TableHead>
                   <TableHead>Price Range</TableHead>
-                  <TableHead>Commission</TableHead>
+                  <TableHead>Avg Commission</TableHead>
                   <TableHead>Rating</TableHead>
                   <TableHead>Tags</TableHead>
                 </TableRow>
@@ -313,7 +324,7 @@ const VendorsPage = () => {
                       <TableCell className="font-medium text-primary">
                         <div className="flex items-center">
                           <DollarSign className="mr-1 h-4 w-4" />
-                          {vendor.commissionRate}%
+                          {vendor.commissionRate.toFixed(1)}%
                         </div>
                       </TableCell>
                       <TableCell>{renderRating(vendor.rating)}</TableCell>
