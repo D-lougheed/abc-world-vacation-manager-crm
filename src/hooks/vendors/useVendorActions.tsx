@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +12,7 @@ interface VendorFormData {
   serviceArea: string;
   priceRange: number;
   notes?: string;
+  locationTagId?: string;
 }
 
 interface ServiceType {
@@ -68,7 +68,8 @@ export const useVendorActions = (
             address: formData.address,
             service_area: formData.serviceArea,
             price_range: formData.priceRange,
-            notes: formData.notes
+            notes: formData.notes,
+            location_tag_id: formData.locationTagId || null
           })
           .select()
           .single();
@@ -96,7 +97,8 @@ export const useVendorActions = (
             address: formData.address,
             service_area: formData.serviceArea,
             price_range: formData.priceRange,
-            notes: formData.notes
+            notes: formData.notes,
+            location_tag_id: formData.locationTagId || null
           })
           .eq('id', vendorId);
         

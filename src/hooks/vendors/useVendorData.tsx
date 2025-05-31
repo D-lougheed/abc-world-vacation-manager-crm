@@ -1,7 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { LocationTag } from "@/types";
 
 interface VendorFormData {
   name: string;
@@ -12,6 +12,7 @@ interface VendorFormData {
   serviceArea: string;
   priceRange: number;
   notes?: string;
+  locationTagId?: string;
 }
 
 interface ServiceType {
@@ -64,6 +65,9 @@ interface UseVendorDataReturn {
   serviceTypeCommissions: ServiceTypeCommission[];
   setServiceTypeCommissions: React.Dispatch<React.SetStateAction<ServiceTypeCommission[]>>;
   defaultCommissionRate: number;
+  locationTags: LocationTag[];
+  selectedLocationTag: LocationTag | null;
+  setSelectedLocationTag: React.Dispatch<React.SetStateAction<LocationTag | null>>;
 }
 
 const DEFAULT_VENDOR_COMMISSION_KEY = "default_vendor_commission_percentage";
@@ -80,7 +84,8 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
     address: "",
     serviceArea: "Local",
     priceRange: 3,
-    notes: ""
+    notes: "",
+    locationTagId: undefined
   });
   
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
@@ -91,6 +96,8 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
   const [documents, setDocuments] = useState<Document[]>([]);
   const [vendorRating, setVendorRating] = useState<number>(0);
   const [serviceTypeCommissions, setServiceTypeCommissions] = useState<ServiceTypeCommission[]>([]);
+  const [locationTags, setLocationTags] = useState<LocationTag[]>([]);
+  const [selectedLocationTag, setSelectedLocationTag] = useState<LocationTag | null>(null);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -137,6 +144,15 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
         if (tagsError) throw tagsError;
         setAvailableTags(tagsData || []);
 
+        // Fetch location tags
+        const { data: locationTagsData, error: locationTagsError } = await supabase
+          .from('location_tags')
+          .select('*')
+          .order('continent, country, state_province, city');
+        
+        if (locationTagsError) throw locationTagsError;
+        setLocationTags(locationTagsData || []);
+
         // For existing vendor, fetch vendor data
         if (!isNewVendor && vendorId) {
           // Fetch vendor
@@ -157,8 +173,15 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
               address: vendorData.address,
               serviceArea: vendorData.service_area,
               priceRange: vendorData.price_range,
-              notes: vendorData.notes || ""
+              notes: vendorData.notes || "",
+              locationTagId: vendorData.location_tag_id || undefined
             });
+            
+            // Set selected location tag if vendor has one
+            if (vendorData.location_tag_id) {
+              const locationTag = locationTagsData?.find(lt => lt.id === vendorData.location_tag_id);
+              setSelectedLocationTag(locationTag || null);
+            }
             
             // Store vendor rating
             setVendorRating(vendorData.rating || 0);
@@ -267,6 +290,9 @@ export const useVendorData = (vendorId: string | undefined, isNewVendor: boolean
     vendorRating,
     serviceTypeCommissions,
     setServiceTypeCommissions,
-    defaultCommissionRate
+    defaultCommissionRate,
+    locationTags,
+    selectedLocationTag,
+    setSelectedLocationTag
   };
 };

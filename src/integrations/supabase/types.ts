@@ -157,6 +157,7 @@ export type Database = {
           id: string
           is_completed: boolean
           location: string
+          location_tag_id: string | null
           notes: string | null
           rating: number | null
           service_type_id: string
@@ -186,6 +187,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           location: string
+          location_tag_id?: string | null
           notes?: string | null
           rating?: number | null
           service_type_id: string
@@ -215,6 +217,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           location?: string
+          location_tag_id?: string | null
           notes?: string | null
           rating?: number | null
           service_type_id?: string
@@ -231,6 +234,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_location_tag_id_fkey"
+            columns: ["location_tag_id"]
+            isOneToOne: false
+            referencedRelation: "location_tags"
             referencedColumns: ["id"]
           },
           {
@@ -768,6 +778,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          location_tag_id: string | null
           name: string
           notes: string | null
           phone: string
@@ -782,6 +793,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          location_tag_id?: string | null
           name: string
           notes?: string | null
           phone: string
@@ -796,6 +808,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          location_tag_id?: string | null
           name?: string
           notes?: string | null
           phone?: string
@@ -804,7 +817,15 @@ export type Database = {
           service_area?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendors_location_tag_id_fkey"
+            columns: ["location_tag_id"]
+            isOneToOne: false
+            referencedRelation: "location_tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
