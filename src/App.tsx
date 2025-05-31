@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,6 +27,7 @@ import AddAgentPage from "./pages/AddAgentPage";
 import ServiceTypesPage from "./pages/ServiceTypesPage";
 import TagsPage from "./pages/TagsPage";
 import BatchEditTagsPage from "./pages/BatchEditTagsPage";
+import LocationTagsPage from "./pages/LocationTagsPage";
 import SystemSettingsPage from "./pages/SystemSettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
@@ -97,6 +99,7 @@ const App = () => (
               <Route path="/admin/service-types" element={<ServiceTypesPage />} />
               <Route path="/admin/tags" element={<TagsPage />} />
               <Route path="/admin/tags/batch-edit" element={<BatchEditTagsPage />} />
+              <Route path="/admin/location-tags" element={<LocationTagsPage />} />
               <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
               <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} />
 
