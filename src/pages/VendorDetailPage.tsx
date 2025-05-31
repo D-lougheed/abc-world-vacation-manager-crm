@@ -64,7 +64,10 @@ const VendorDetailPage = () => {
     vendorRating,
     serviceTypeCommissions,
     setServiceTypeCommissions,
-    defaultCommissionRate
+    defaultCommissionRate,
+    locationTags,
+    selectedLocationTag,
+    setSelectedLocationTag
   } = useVendorData(id, isNewVendor);
   
   const {
@@ -177,6 +180,9 @@ const VendorDetailPage = () => {
                 setTags={setTags}
                 onSave={handleSaveAndExitEditMode}
                 saving={saving}
+                locationTags={locationTags}
+                selectedLocationTag={selectedLocationTag}
+                setSelectedLocationTag={setSelectedLocationTag}
               />
             ) : (
               <VendorInfo

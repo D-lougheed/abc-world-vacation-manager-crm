@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { LocationTag } from "@/types";
+import LocationTagSelect from "@/components/LocationTagSelect";
 
 export interface VendorFormData {
   name: string;
@@ -35,6 +37,7 @@ export interface VendorFormData {
   serviceArea: string;
   priceRange: number;
   notes?: string;
+  locationTagId?: string;
 }
 
 interface ServiceType {
@@ -58,6 +61,9 @@ interface VendorFormProps {
   setTags: React.Dispatch<React.SetStateAction<Tag[]>>;
   onSave: () => Promise<void>;
   saving: boolean;
+  locationTags: LocationTag[];
+  selectedLocationTag: LocationTag | null;
+  setSelectedLocationTag: React.Dispatch<React.SetStateAction<LocationTag | null>>;
 }
 
 const VendorForm = ({
@@ -69,7 +75,10 @@ const VendorForm = ({
   tags,
   setTags,
   onSave,
-  saving
+  saving,
+  locationTags,
+  selectedLocationTag,
+  setSelectedLocationTag
 }: VendorFormProps) => {
   const [selectedServiceType, setSelectedServiceType] = useState<string>("");
   const [availableServiceTypes, setAvailableServiceTypes] = useState<ServiceType[]>([]);
@@ -121,6 +130,14 @@ const VendorForm = ({
     setFormData(prevData => ({
       ...prevData,
       priceRange: value[0]
+    }));
+  };
+
+  const handleLocationTagChange = (locationTag: LocationTag | null) => {
+    setSelectedLocationTag(locationTag);
+    setFormData(prevData => ({
+      ...prevData,
+      locationTagId: locationTag?.id || undefined
     }));
   };
 
@@ -228,6 +245,17 @@ const VendorForm = ({
             placeholder="123 Business Ave, City, State"
           />
         </div>
+      </div>
+
+      {/* Location Tag Selection */}
+      <div className="space-y-2">
+        <Label>Location</Label>
+        <LocationTagSelect
+          locationTags={locationTags}
+          selectedLocationTag={selectedLocationTag}
+          onLocationTagChange={handleLocationTagChange}
+          placeholder="Select vendor location..."
+        />
       </div>
       
       <div className="space-y-2">
