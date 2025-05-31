@@ -55,14 +55,14 @@ const bookingSchema = z.object({
   bookingStatus: z.enum(["Pending", "Confirmed", "Canceled"]),
   commissionStatus: z.enum(["Unreceived", "Received", "Completed", "Canceled"]),
   billingStatus: z.enum(["Draft", "Awaiting Deposit", "Awaiting Final Payment", "Paid"]).optional(),
-  depositAmount: z.number().optional(), // Made optional
+  depositAmount: z.number().optional(),
   finalPaymentDueDate: z.date().optional(),
   isCompleted: z.boolean().optional(),
-  rating: z.number().min(1).max(5).optional(), // Made optional
-  clientRating: z.number().min(1).max(5).optional(), // Made optional
+  rating: z.number().min(1).max(5).optional(),
+  clientRating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
   agentId: z.string().min(1, "Agent is required"),
-  subAgent: z.string().optional(), // Made optional
+  subAgent: z.string().optional(),
 });
 
 type BookingFormData = z.infer<typeof bookingSchema>;
@@ -109,6 +109,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [filteredServiceTypes, setFilteredServiceTypes] = useState<ServiceType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -154,6 +155,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const watchedRating = watch("rating");
   const watchedClientRating = watch("clientRating");
   const watchedStartDate = watch("startDate");
+  const watchedClients = watch("clients");
 
   // Calculate commission amount when cost or rate changes
   const commissionAmount = watchedCost && watchedCommissionRate 
@@ -178,6 +180,15 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     });
   };
 
+  // Filter trips when clients change
+  useEffect(() => {
+    if (watchedClients && watchedClients.length > 0) {
+      filterTripsByClients(watchedClients);
+    } else {
+      setFilteredTrips(trips);
+    }
+  }, [watchedClients, trips]);
+
   // Filter service types when vendor changes
   useEffect(() => {
     if (watchedVendor) {
@@ -197,6 +208,50 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       fetchCommissionRate(watchedVendor, watchedServiceType);
     }
   }, [watchedServiceType]);
+
+  const filterTripsByClients = async (clientIds: string[]) => {
+    try {
+      if (clientIds.length === 0) {
+        setFilteredTrips(trips);
+        return;
+      }
+
+      // Get trips that include ALL selected clients
+      const { data: tripClientData, error } = await supabase
+        .from('trip_clients')
+        .select('trip_id')
+        .in('client_id', clientIds);
+
+      if (error) {
+        console.error('Error filtering trips by clients:', error);
+        setFilteredTrips(trips);
+        return;
+      }
+
+      // Count how many times each trip appears (should equal number of selected clients)
+      const tripCounts = tripClientData.reduce((acc: Record<string, number>, tc) => {
+        acc[tc.trip_id] = (acc[tc.trip_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Filter trips that have all selected clients
+      const validTripIds = Object.keys(tripCounts).filter(
+        tripId => tripCounts[tripId] === clientIds.length
+      );
+
+      const filtered = trips.filter(trip => validTripIds.includes(trip.id));
+      setFilteredTrips(filtered);
+
+      // Clear trip selection if current trip is not valid for selected clients
+      const currentTrip = watch("trip");
+      if (currentTrip && !validTripIds.includes(currentTrip)) {
+        setValue("trip", "");
+      }
+    } catch (error) {
+      console.error('Error filtering trips:', error);
+      setFilteredTrips(trips);
+    }
+  };
 
   const fetchFormData = async () => {
     try {
@@ -248,6 +303,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
       setClients(clientsResult.data || []);
       setVendors(vendorsResult.data || []);
       setTrips(tripsResult.data || []);
+      setFilteredTrips(tripsResult.data || []);
       setServiceTypes(serviceTypesResult.data || []);
       setUsers(usersResult.data || []);
 
@@ -330,6 +386,22 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     } catch (error: any) {
       console.error("Error fetching commission rate:", error);
       setValue("commissionRate", defaultCommissionRate);
+    }
+  };
+
+  const handleUseVendorLocation = () => {
+    const vendorLocation = useVendorLocation();
+    if (vendorLocation) {
+      toast({
+        title: "Location updated",
+        description: "Vendor location has been applied to this booking.",
+      });
+    } else {
+      toast({
+        title: "No vendor location",
+        description: "The selected vendor doesn't have a location tag set.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -539,7 +611,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   )}
                 </div>
 
-                {/* Trip Selection (Optional) */}
+                {/* Trip Selection (Optional) - Now filtered by clients */}
                 <div className="space-y-2">
                   <Label htmlFor="trip">Associated Trip</Label>
                   <Select value={watch("trip")} onValueChange={(value) => setValue("trip", value)}>
@@ -547,13 +619,16 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                       <SelectValue placeholder="Select a trip (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {trips.map((trip) => (
+                      {filteredTrips.map((trip) => (
                         <SelectItem key={trip.id} value={trip.id}>
                           {trip.name} ({format(new Date(trip.start_date), "MMM dd")} - {format(new Date(trip.end_date), "MMM dd, yyyy")})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {watchedClients && watchedClients.length > 0 && filteredTrips.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No trips found that include all selected clients.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -580,7 +655,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={useVendorLocation}
+                        onClick={handleUseVendorLocation}
                         className="text-xs"
                       >
                         <MapPin className="h-3 w-3 mr-1" />
@@ -621,7 +696,6 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
               </CardContent>
             </Card>
 
-            {/* Booking Agent Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Booking Agent</CardTitle>

@@ -62,10 +62,6 @@ export const useBookingForm = ({ initialData, bookingId }: UseBookingFormProps) 
       
       if (data?.location_tags) {
         setVendorLocationTag(data.location_tags as LocationTag);
-        // Auto-inherit vendor's location tag if no location tag is currently selected
-        if (!selectedLocationTag) {
-          setSelectedLocationTag(data.location_tags as LocationTag);
-        }
       } else {
         setVendorLocationTag(null);
       }
@@ -81,7 +77,9 @@ export const useBookingForm = ({ initialData, bookingId }: UseBookingFormProps) 
   const useVendorLocation = () => {
     if (vendorLocationTag) {
       setSelectedLocationTag(vendorLocationTag);
+      return vendorLocationTag;
     }
+    return null;
   };
 
   return {
