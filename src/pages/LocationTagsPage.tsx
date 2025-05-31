@@ -4,12 +4,10 @@ import { Plus, Edit, Trash2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -26,10 +24,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
+import LocationTagHierarchy from "@/components/LocationTagHierarchy";
+import LocationTagForm from "@/components/LocationTagForm";
 
 interface LocationTag {
   id: string;
@@ -49,13 +50,6 @@ const LocationTagsPage = () => {
   const [deleteTagId, setDeleteTagId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
-
-  const [formData, setFormData] = useState({
-    continent: "",
-    country: "",
-    state_province: "",
-    city: "",
-  });
 
   useEffect(() => {
     fetchLocationTags();
@@ -85,30 +79,12 @@ const LocationTagsPage = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.continent.trim() || !formData.country.trim()) {
-      toast({
-        title: "Error",
-        description: "Continent and Country are required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleSubmit = async (formData: any) => {
     try {
-      const submitData = {
-        continent: formData.continent.trim(),
-        country: formData.country.trim(),
-        state_province: formData.state_province.trim() || null,
-        city: formData.city.trim() || null,
-      };
-
       if (editingTag) {
         const { error } = await supabase
           .from('location_tags')
-          .update(submitData)
+          .update(formData)
           .eq('id', editingTag.id);
 
         if (error) throw error;
@@ -120,7 +96,7 @@ const LocationTagsPage = () => {
       } else {
         const { error } = await supabase
           .from('location_tags')
-          .insert([submitData]);
+          .insert([formData]);
 
         if (error) throw error;
         
@@ -130,7 +106,6 @@ const LocationTagsPage = () => {
         });
       }
 
-      setFormData({ continent: "", country: "", state_province: "", city: "" });
       setIsDialogOpen(false);
       setEditingTag(null);
       fetchLocationTags();
@@ -145,12 +120,6 @@ const LocationTagsPage = () => {
 
   const handleEdit = (tag: LocationTag) => {
     setEditingTag(tag);
-    setFormData({
-      continent: tag.continent,
-      country: tag.country,
-      state_province: tag.state_province || "",
-      city: tag.city || "",
-    });
     setIsDialogOpen(true);
   };
 
@@ -183,7 +152,6 @@ const LocationTagsPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ continent: "", country: "", state_province: "", city: "" });
     setEditingTag(null);
   };
 
@@ -220,140 +188,110 @@ const LocationTagsPage = () => {
                 Add Location Tag
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingTag ? "Edit Location Tag" : "Add Location Tag"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Create a hierarchical location tag with continent, country, and optional state/province and city.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="continent">Continent *</Label>
-                    <Input
-                      id="continent"
-                      value={formData.continent}
-                      onChange={(e) => setFormData(prev => ({ ...prev, continent: e.target.value }))}
-                      placeholder="e.g., North America, Europe, Asia"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country *</Label>
-                    <Input
-                      id="country"
-                      value={formData.country}
-                      onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                      placeholder="e.g., United States, France, Japan"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="state_province">State/Province</Label>
-                    <Input
-                      id="state_province"
-                      value={formData.state_province}
-                      onChange={(e) => setFormData(prev => ({ ...prev, state_province: e.target.value }))}
-                      placeholder="e.g., California, Île-de-France, Tokyo"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={formData.city}
-                      onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                      placeholder="e.g., Los Angeles, Paris, Tokyo"
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button type="submit">
-                    {editingTag ? "Update" : "Create"} Location Tag
-                  </Button>
-                </DialogFooter>
-              </form>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingTag ? "Edit Location Tag" : "Add Location Tag"}
+                </DialogTitle>
+                <DialogDescription>
+                  Create a hierarchical location tag with continent, country, and optional state/province and city.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <LocationTagForm
+                editingTag={editingTag}
+                onSubmit={handleSubmit}
+                onCancel={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}
+              />
             </DialogContent>
           </Dialog>
         </div>
         
         <Separator />
-        
-        <div className="flex items-center space-x-4">
-          <Input
-            placeholder="Search location tags..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
-        </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredLocationTags.map((tag) => (
-              <Card key={tag.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <MapPin className="mr-2 h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">{formatLocationDisplay(tag)}</span>
-                    </div>
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(tag)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleteTagId(tag.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="outline">{tag.continent}</Badge>
-                      <Badge variant="outline">{tag.country}</Badge>
-                      {tag.state_province && <Badge variant="outline">{tag.state_province}</Badge>}
-                      {tag.city && <Badge variant="outline">{tag.city}</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Created: {new Date(tag.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        <Tabs defaultValue="hierarchy" className="w-full">
+          <TabsList>
+            <TabsTrigger value="hierarchy">Hierarchy View</TabsTrigger>
+            <TabsTrigger value="list">List View</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="hierarchy">
+            <LocationTagHierarchy />
+          </TabsContent>
+          
+          <TabsContent value="list" className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <Input
+                placeholder="Search location tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
 
-        {!loading && filteredLocationTags.length === 0 && (
-          <div className="text-center py-12">
-            <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              {searchTerm ? "No location tags found matching your search." : "No location tags created yet."}
-            </p>
-          </div>
-        )}
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredLocationTags.map((tag) => (
+                  <Card key={tag.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <MapPin className="mr-2 h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">{formatLocationDisplay(tag)}</span>
+                        </div>
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(tag)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteTagId(tag.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline">{tag.continent}</Badge>
+                          <Badge variant="outline">{tag.country}</Badge>
+                          {tag.state_province && <Badge variant="outline">{tag.state_province}</Badge>}
+                          {tag.city && <Badge variant="outline">{tag.city}</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Created: {new Date(tag.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {!loading && filteredLocationTags.length === 0 && (
+              <div className="text-center py-12">
+                <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  {searchTerm ? "No location tags found matching your search." : "No location tags created yet."}
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <AlertDialog open={!!deleteTagId} onOpenChange={() => setDeleteTagId(null)}>
           <AlertDialogContent>
