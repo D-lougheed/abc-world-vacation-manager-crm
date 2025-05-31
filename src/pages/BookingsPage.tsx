@@ -46,7 +46,7 @@ const BookingsPage = () => {
       try {
         setLoading(true);
         
-        // Start building the query
+        // Start building the query - order by start_date (booking date) in descending order
         let query = supabase
           .from('bookings')
           .select(`
@@ -55,7 +55,7 @@ const BookingsPage = () => {
             service_type:service_type_id(name),
             booking_clients(client_id)
           `)
-          .order('created_at', { ascending: false });
+          .order('start_date', { ascending: false });
 
         // Apply filters
         if (filters.status !== "all") {
