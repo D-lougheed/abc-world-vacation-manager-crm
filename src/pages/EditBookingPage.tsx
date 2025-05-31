@@ -69,7 +69,9 @@ const EditBookingPage = () => {
           // Add new billing fields
           billingStatus: data.billing_status as BillingStatus || BillingStatus.Draft,
           depositAmount: data.deposit_amount,
-          finalPaymentDueDate: data.final_payment_due_date ? new Date(data.final_payment_due_date) : undefined
+          finalPaymentDueDate: data.final_payment_due_date ? new Date(data.final_payment_due_date) : undefined,
+          // Add location tag field
+          locationTagId: data.location_tag_id
         };
         
         console.log("Formatted booking data for form:", formattedData);

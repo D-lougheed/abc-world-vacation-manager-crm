@@ -28,13 +28,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Star } from "lucide-react";
+import { CalendarIcon, Plus, Star, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { BookingStatus, CommissionStatus, BillingStatus } from "@/types";
+import { BookingStatus, CommissionStatus, BillingStatus, LocationTag } from "@/types";
 import { MultiSelect } from "./MultiSelect";
+import LocationTagSelect from "@/components/LocationTagSelect";
+import { useBookingForm } from "@/hooks/useBookingForm";
 
 const bookingSchema = z.object({
   clients: z.array(z.string()).min(1, "At least one client is required"),
@@ -113,6 +115,16 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(10);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
 
+  // Use the location tag hook
+  const {
+    locationTags,
+    selectedLocationTag,
+    vendorLocationTag,
+    handleLocationTagChange,
+    fetchVendorLocationTag,
+    useVendorLocation
+  } = useBookingForm({ initialData, bookingId });
+
   const isEditing = !!bookingId;
   const canEditAgents = currentUserRole === "Admin" || currentUserRole === "SuperAdmin";
 
@@ -141,6 +153,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
   const watchedCommissionRate = watch("commissionRate");
   const watchedRating = watch("rating");
   const watchedClientRating = watch("clientRating");
+  const watchedStartDate = watch("startDate");
 
   // Calculate commission amount when cost or rate changes
   const commissionAmount = watchedCost && watchedCommissionRate 
@@ -170,9 +183,10 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
     if (watchedVendor) {
       fetchVendorServiceTypes(watchedVendor);
       fetchCommissionRate(watchedVendor, watchedServiceType);
+      // Fetch vendor's location tag
+      fetchVendorLocationTag(watchedVendor);
     } else {
       setFilteredServiceTypes([]);
-      // Clear service type if vendor is cleared
       setValue("serviceType", "");
     }
   }, [watchedVendor]);
@@ -352,6 +366,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
         end_date: data.endDate ? format(data.endDate, "yyyy-MM-dd") : null,
         end_time: convertTo24HourFormat(data.endTime || ""),
         location: data.location,
+        location_tag_id: selectedLocationTag?.id || null,
         cost: data.cost,
         commission_rate: data.commissionRate,
         commission_amount: calculatedCommissionAmount,
@@ -543,6 +558,69 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
               </CardContent>
             </Card>
 
+            {/* Location & Tag Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Location & Tag Information</CardTitle>
+                <CardDescription>Set the location and geographical details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Location Tag Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="locationTag">Location Tag</Label>
+                  <LocationTagSelect
+                    locationTags={locationTags}
+                    selectedLocationTag={selectedLocationTag}
+                    onLocationTagChange={handleLocationTagChange}
+                    placeholder="Select a location tag..."
+                  />
+                  {vendorLocationTag && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={useVendorLocation}
+                        className="text-xs"
+                      >
+                        <MapPin className="h-3 w-3 mr-1" />
+                        Use vendor location
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Vendor location: {vendorLocationTag.continent}, {vendorLocationTag.country}
+                        {vendorLocationTag.state_province && `, ${vendorLocationTag.state_province}`}
+                        {vendorLocationTag.city && `, ${vendorLocationTag.city}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location *</Label>
+                  <Input
+                    type="text"
+                    id="location"
+                    placeholder="Enter the specific location"
+                    {...register("location")}
+                  />
+                  {errors.location && (
+                    <p className="text-sm text-destructive">{errors.location.message}</p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Additional notes for this booking..."
+                    {...register("notes")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Booking Agent Section */}
             <Card>
               <CardHeader>
@@ -651,6 +729,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                         selected={watch("startDate")}
                         onSelect={(date) => setValue("startDate", date)}
                         initialFocus
+                        className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
@@ -669,7 +748,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                   />
                 </div>
 
-                {/* End Date (Optional) */}
+                {/* End Date (Optional) - Now starts from start date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date</Label>
                   <Popover>
@@ -695,9 +774,11 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                         selected={watch("endDate")}
                         onSelect={(date) => setValue("endDate", date)}
                         disabled={(date) =>
-                          watch("startDate") && date < watch("startDate")!
+                          watchedStartDate && date < watchedStartDate
                         }
+                        defaultMonth={watchedStartDate || new Date()}
                         initialFocus
+                        className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
@@ -710,38 +791,6 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                     type="time"
                     id="endTime"
                     {...register("endTime")}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Location & Details</CardTitle>
-                <CardDescription>Additional booking information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Location */}
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location *</Label>
-                  <Input
-                    type="text"
-                    id="location"
-                    placeholder="Enter the location"
-                    {...register("location")}
-                  />
-                  {errors.location && (
-                    <p className="text-sm text-destructive">{errors.location.message}</p>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Additional notes for this booking..."
-                    {...register("notes")}
                   />
                 </div>
               </CardContent>
@@ -832,6 +881,7 @@ const BookingForm = ({ initialData, bookingId }: BookingFormProps) => {
                           date < new Date()
                         }
                         initialFocus
+                        className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
