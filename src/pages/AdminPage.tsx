@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { 
   Settings,
@@ -7,6 +8,7 @@ import {
   ArrowRight,
   UploadCloud,
   FileText,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +84,25 @@ const AdminPage = () => {
               </p>
               <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
                 <span>Manage Tags</span>
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/location-tags")}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center">
+                <MapPin className="mr-2 h-5 w-5 text-primary" />
+                Location Tags
+              </CardTitle>
+              <CardDescription>Manage location-based tags and categorization</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Create and organize location tags by continent, country, state/province, and city for better categorization.
+              </p>
+              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                <span>Manage Location Tags</span>
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>

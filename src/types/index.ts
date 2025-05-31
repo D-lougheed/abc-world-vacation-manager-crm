@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   SuperAdmin = "SuperAdmin",
   Admin = "Admin",
@@ -128,6 +129,16 @@ export interface ServiceType {
 export interface Tag {
   id: string;
   name: string;
+}
+
+export interface LocationTag {
+  id: string;
+  continent: string;
+  country: string;
+  state_province: string | null;
+  city: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface HelpfulLink {

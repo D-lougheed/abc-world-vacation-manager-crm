@@ -352,6 +352,36 @@ export type Database = {
         }
         Relationships: []
       }
+      location_tags: {
+        Row: {
+          city: string | null
+          continent: string
+          country: string
+          created_at: string
+          id: string
+          state_province: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          continent: string
+          country: string
+          created_at?: string
+          id?: string
+          state_province?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          continent?: string
+          country?: string
+          created_at?: string
+          id?: string
+          state_province?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           accepting_new_bookings: boolean
