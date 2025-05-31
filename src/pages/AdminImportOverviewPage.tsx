@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Briefcase, Tags as TagsIcon, Puzzle, ArrowRight } from "lucide-react"; // Puzzle for Service Types
+import { Users, Briefcase, Tags as TagsIcon, Puzzle, ArrowRight, MapPin } from "lucide-react";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { UserRole } from "@/types";
 
@@ -40,6 +40,13 @@ const importOptions = [
     icon: TagsIcon,
     path: "/admin/import/tags",
     requiredFields: ["name"],
+  },
+  {
+    title: "Import Location Tags",
+    description: "Bulk import location tags from a CSV file.",
+    icon: MapPin,
+    path: "/admin/import/location-tags",
+    requiredFields: ["continent", "country", "state_province", "city"],
   },
 ];
 

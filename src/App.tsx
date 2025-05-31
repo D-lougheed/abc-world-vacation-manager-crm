@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,6 +38,7 @@ import ClientImportPage from "./pages/ClientImportPage";
 import VendorImportPage from "./pages/VendorImportPage";
 import ServiceTypeImportPage from "./pages/ServiceTypeImportPage";
 import TagImportPage from "./pages/TagImportPage";
+import LocationTagImportPage from "./pages/LocationTagImportPage";
 
 // Import Audit Log Page
 import AdminAuditLogPage from "./pages/AdminAuditLogPage";
@@ -109,6 +109,7 @@ const App = () => (
               <Route path="/admin/import/vendors" element={<VendorImportPage />} />
               <Route path="/admin/import/service-types" element={<ServiceTypeImportPage />} />
               <Route path="/admin/import/tags" element={<TagImportPage />} />
+              <Route path="/admin/import/location-tags" element={<LocationTagImportPage />} />
             </Route>
             
             <Route path="*" element={<NotFound />} />
