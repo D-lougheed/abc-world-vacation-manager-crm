@@ -160,129 +160,137 @@ const VendorDetailPage = () => {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: Vendor information */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>{isEditMode ? (isNewVendor ? "Vendor Information" : "Edit Vendor Information") : "Vendor Details"}</CardTitle>
-            {isNewVendor && <CardDescription>Add details about this vendor</CardDescription>}
-          </CardHeader>
-          <CardContent>
-            {isEditMode ? (
-              <VendorForm
-                isNewVendor={isNewVendor}
-                vendorId={id}
-                formData={formData}
-                setFormData={setFormData}
-                serviceTypes={serviceTypes}
-                setServiceTypes={setServiceTypes}
-                tags={tags}
-                setTags={setTags}
-                onSave={handleSaveAndExitEditMode}
-                saving={saving}
-                locationTags={locationTags}
-                selectedLocationTag={selectedLocationTag}
-                setSelectedLocationTag={setSelectedLocationTag}
-              />
-            ) : (
-              <VendorInfo
-                name={formData.name}
-                contactPerson={formData.contactPerson}
-                email={formData.email}
-                phone={formData.phone}
-                address={formData.address}
-                serviceArea={formData.serviceArea}
-                priceRange={formData.priceRange}
-                serviceTypes={serviceTypes}
-                tags={tags}
-                notes={formData.notes}
-                rating={vendorRating}
-              />
+      {/* Main content with tabs */}
+      <Card>
+        <CardContent className="p-0">
+          <Tabs defaultValue="details" className="w-full">
+            <div className="px-6 pt-6">
+              <TabsList className={`grid w-full ${isNewVendor ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                <TabsTrigger value="details">Vendor Details</TabsTrigger>
+                {!isNewVendor && (
+                  <>
+                    <TabsTrigger value="bookings">Booking History</TabsTrigger>
+                    <TabsTrigger value="documents">Documents</TabsTrigger>
+                  </>
+                )}
+              </TabsList>
+            </div>
+            
+            <TabsContent value="details" className="p-6 pt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left column: Vendor information */}
+                <Card className="lg:col-span-1">
+                  <CardHeader>
+                    <CardTitle>{isEditMode ? (isNewVendor ? "Vendor Information" : "Edit Vendor Information") : "Vendor Details"}</CardTitle>
+                    {isNewVendor && <CardDescription>Add details about this vendor</CardDescription>}
+                  </CardHeader>
+                  <CardContent>
+                    {isEditMode ? (
+                      <VendorForm
+                        isNewVendor={isNewVendor}
+                        vendorId={id}
+                        formData={formData}
+                        setFormData={setFormData}
+                        serviceTypes={serviceTypes}
+                        setServiceTypes={setServiceTypes}
+                        tags={tags}
+                        setTags={setTags}
+                        onSave={handleSaveAndExitEditMode}
+                        saving={saving}
+                        locationTags={locationTags}
+                        selectedLocationTag={selectedLocationTag}
+                        setSelectedLocationTag={setSelectedLocationTag}
+                      />
+                    ) : (
+                      <VendorInfo
+                        name={formData.name}
+                        contactPerson={formData.contactPerson}
+                        email={formData.email}
+                        phone={formData.phone}
+                        address={formData.address}
+                        serviceArea={formData.serviceArea}
+                        priceRange={formData.priceRange}
+                        serviceTypes={serviceTypes}
+                        tags={tags}
+                        notes={formData.notes}
+                        rating={vendorRating}
+                      />
+                    )}
+                  </CardContent>
+                  <CardFooter className="justify-between">
+                    {isEditMode ? (
+                      isNewVendor ? (
+                        <p className="text-sm text-muted-foreground">* Required fields</p>
+                      ) : (
+                        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Vendor
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Delete Vendor</DialogTitle>
+                              <DialogDescription>
+                                Are you sure you want to delete this vendor? This action cannot be undone.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                              <Button 
+                                variant="destructive" 
+                                onClick={handleDeleteVendor}
+                                disabled={saving}
+                              >
+                                {saving ? "Deleting..." : "Delete Vendor"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )
+                    ) : (
+                      <RoleBasedComponent requiredRole={UserRole.Admin}>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsEditMode(true)}
+                          className="w-full"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Vendor Details
+                        </Button>
+                      </RoleBasedComponent>
+                    )}
+                  </CardFooter>
+                </Card>
+                
+                {/* Right column: Service Type Commission Rates */}
+                <div className="lg:col-span-2">
+                  <ServiceTypeCommissions
+                    vendorId={id}
+                    isNewVendor={isNewVendor}
+                    serviceTypes={serviceTypes}
+                    onCommissionsChange={setServiceTypeCommissions}
+                    defaultCommissionRate={defaultCommissionRate}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {!isNewVendor && (
+              <>
+                <TabsContent value="bookings" className="p-6 pt-4">
+                  <BookingHistory bookings={bookings} />
+                </TabsContent>
+                
+                <TabsContent value="documents" className="p-6 pt-4">
+                  <DocumentsList documents={documents} />
+                </TabsContent>
+              </>
             )}
-          </CardContent>
-          <CardFooter className="justify-between">
-            {isEditMode ? (
-              isNewVendor ? (
-                <p className="text-sm text-muted-foreground">* Required fields</p>
-              ) : (
-                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Vendor
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Delete Vendor</DialogTitle>
-                      <DialogDescription>
-                        Are you sure you want to delete this vendor? This action cannot be undone.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-                      <Button 
-                        variant="destructive" 
-                        onClick={handleDeleteVendor}
-                        disabled={saving}
-                      >
-                        {saving ? "Deleting..." : "Delete Vendor"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )
-            ) : (
-              <RoleBasedComponent requiredRole={UserRole.Admin}>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditMode(true)}
-                  className="w-full"
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Vendor Details
-                </Button>
-              </RoleBasedComponent>
-            )}
-          </CardFooter>
-        </Card>
-        
-        {/* Right column: Commission rates and tabs for bookings/documents */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Service Type Commission Rates */}
-          <ServiceTypeCommissions
-            vendorId={id}
-            isNewVendor={isNewVendor}
-            serviceTypes={serviceTypes}
-            onCommissionsChange={setServiceTypeCommissions}
-            defaultCommissionRate={defaultCommissionRate}
-          />
-          
-          {/* Tabs for Bookings and Documents - only show for existing vendors */}
-          {!isNewVendor && (
-            <Card>
-              <CardContent className="p-0">
-                <Tabs defaultValue="bookings" className="w-full">
-                  <div className="px-6 pt-6">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="bookings">Booking History</TabsTrigger>
-                      <TabsTrigger value="documents">Documents</TabsTrigger>
-                    </TabsList>
-                  </div>
-                  
-                  <TabsContent value="bookings" className="p-6 pt-4">
-                    <BookingHistory bookings={bookings} />
-                  </TabsContent>
-                  
-                  <TabsContent value="documents" className="p-6 pt-4">
-                    <DocumentsList documents={documents} />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };
