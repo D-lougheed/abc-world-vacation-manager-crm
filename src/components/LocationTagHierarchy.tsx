@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -218,7 +217,7 @@ const LocationTagHierarchy = () => {
                               <MapIcon className="mr-2 h-3 w-3 text-orange-600" />
                               <span className="text-sm font-medium">{stateName}</span>
                               {cities.length > 0 && (
-                                <Badge variant="outline" size="sm" className="ml-2">
+                                <Badge variant="outline" className="ml-2 text-xs">
                                   {cities.length} cities
                                 </Badge>
                               )}
