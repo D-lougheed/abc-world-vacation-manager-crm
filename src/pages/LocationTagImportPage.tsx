@@ -2,37 +2,68 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft } from 'lucide-react';
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import { UserRole } from "@/types";
-import { ArrowLeft, UploadCloud } from 'lucide-react';
+import CsvImport from '@/components/CsvImport';
+import { useLocationTagImport } from '@/hooks/useLocationTagImport';
 
 const LocationTagImportPage = () => {
   const navigate = useNavigate();
+  const { importLocationTags } = useLocationTagImport();
+  
   const requiredFields = ["continent", "country", "state_province", "city"];
 
+  const sampleData = [
+    {
+      continent: "North America",
+      country: "United States", 
+      state_province: "California",
+      city: "Los Angeles"
+    },
+    {
+      continent: "North America",
+      country: "United States",
+      state_province: "California", 
+      city: "San Francisco"
+    },
+    {
+      continent: "Europe",
+      country: "France",
+      state_province: "Île-de-France",
+      city: "Paris"
+    },
+    {
+      continent: "Asia",
+      country: "Japan",
+      state_province: "Tokyo",
+      city: "Tokyo"
+    },
+    {
+      continent: "Europe",
+      country: "United Kingdom",
+      state_province: "England",
+      city: "London"
+    }
+  ];
+
   return (
-    <RoleBasedComponent requiredRole={UserRole.Admin} fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}>
+    <RoleBasedComponent 
+      requiredRole={UserRole.Admin} 
+      fallback={<div className="text-center py-10">You do not have permission to view this page.</div>}
+    >
       <div className="space-y-6">
         <Button variant="outline" onClick={() => navigate('/admin/import')} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Mass Import Overview
         </Button>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <UploadCloud className="mr-2 h-5 w-5 text-primary" /> Import Location Tags
-            </CardTitle>
-            <CardDescription>
-              Upload a CSV file to bulk import location tags. Required CSV Headers: <code>{requiredFields.join(", ")}</code>.
-              <br />
-              All fields are required for location tags. The import will create hierarchical location tags with continent, country, state/province, and city.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Location tag import functionality is under development. Please check back later.</p>
-            {/* Placeholder for file input and import button */}
-          </CardContent>
-        </Card>
+        
+        <CsvImport
+          title="Import Location Tags"
+          description="Upload a CSV file to bulk import location tags. All fields are required and will create hierarchical location tags with continent, country, state/province, and city."
+          requiredFields={requiredFields}
+          onImport={importLocationTags}
+          sampleData={sampleData}
+        />
       </div>
     </RoleBasedComponent>
   );
