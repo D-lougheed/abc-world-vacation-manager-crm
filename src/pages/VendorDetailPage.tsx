@@ -247,7 +247,7 @@ const VendorDetailPage = () => {
           </CardFooter>
         </Card>
         
-        {/* Right column: Commission rates, bookings, and documents */}
+        {/* Right column: Commission rates and tabs for bookings/documents */}
         <div className="lg:col-span-2 space-y-6">
           {/* Service Type Commission Rates */}
           <ServiceTypeCommissions
@@ -258,29 +258,28 @@ const VendorDetailPage = () => {
             defaultCommissionRate={defaultCommissionRate}
           />
           
-          {/* Bookings and Documents - only show for existing vendors */}
+          {/* Tabs for Bookings and Documents - only show for existing vendors */}
           {!isNewVendor && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Bookings Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Booking History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <BookingHistory bookings={bookings} />
-                </CardContent>
-              </Card>
-
-              {/* Documents Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <DocumentsList documents={documents} />
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardContent className="p-0">
+                <Tabs defaultValue="bookings" className="w-full">
+                  <div className="px-6 pt-6">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="bookings">Booking History</TabsTrigger>
+                      <TabsTrigger value="documents">Documents</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  
+                  <TabsContent value="bookings" className="p-6 pt-4">
+                    <BookingHistory bookings={bookings} />
+                  </TabsContent>
+                  
+                  <TabsContent value="documents" className="p-6 pt-4">
+                    <DocumentsList documents={documents} />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
