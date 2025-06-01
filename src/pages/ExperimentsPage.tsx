@@ -4,9 +4,8 @@ import {
   FlaskConical,
   ArrowLeft,
   Settings,
-  Zap,
   TestTube,
-  Beaker,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,33 +69,14 @@ const ExperimentsPage = () => {
           <Card className="cursor-pointer hover:bg-muted/50">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center">
-                <Zap className="mr-2 h-5 w-5 text-primary" />
-                Performance Testing
+                <BarChart3 className="mr-2 h-5 w-5 text-primary" />
+                Graphs
               </CardTitle>
-              <CardDescription>Test system performance and scalability</CardDescription>
+              <CardDescription>Advanced data visualization and analytics</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Run performance benchmarks and stress tests on the platform.
-              </p>
-              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between" disabled>
-                <span>Coming Soon</span>
-                <Settings className="h-4 w-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:bg-muted/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center">
-                <Beaker className="mr-2 h-5 w-5 text-primary" />
-                Data Migration Tools
-              </CardTitle>
-              <CardDescription>Advanced data migration and cleanup utilities</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Tools for migrating data between environments and cleaning up orphaned records.
+                Create and customize advanced charts and graphs for business insights.
               </p>
               <Button variant="ghost" size="sm" className="mt-2 w-full justify-between" disabled>
                 <span>Coming Soon</span>
