@@ -9,6 +9,7 @@ import {
   UploadCloud,
   FileText,
   MapPin,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,6 +146,27 @@ const AdminPage = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <RoleBasedComponent requiredRole={UserRole.SuperAdmin}>
+            <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/experiments")}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center">
+                  <FlaskConical className="mr-2 h-5 w-5 text-primary" />
+                  Experiments
+                </CardTitle>
+                <CardDescription>Advanced experimental features and tools</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Access experimental features, performance testing, and advanced administrative tools. Super Admin only.
+                </p>
+                <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                  <span>Enter Lab</span>
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </CardContent>
+            </Card>
+          </RoleBasedComponent>
 
           <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/system-settings")}>
             <CardHeader className="pb-3">
