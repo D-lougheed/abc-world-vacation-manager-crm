@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   BarChart3,
   ArrowLeft,
+  Map,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
 import SimpleBookingsChart from "@/components/charts/SimpleBookingsChart";
+import BookingsMapChart from "@/components/charts/BookingsMapChart";
 
 const GraphsPage = () => {
   const navigate = useNavigate();
@@ -43,14 +45,31 @@ const GraphsPage = () => {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bookings by Country</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SimpleBookingsChart />
-          </CardContent>
-        </Card>
+        <div className="grid gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Bookings by Country (Summary)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SimpleBookingsChart />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map className="h-5 w-5" />
+                Bookings Map Visualization
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BookingsMapChart />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </RoleBasedComponent>
   );
