@@ -19,8 +19,7 @@ const VendorImportPage = () => {
     "phone", 
     "address", 
     "serviceArea", 
-    "priceRange", 
-    "commissionRate"
+    "priceRange"
   ];
 
   const sampleData = [
@@ -88,6 +87,7 @@ const VendorImportPage = () => {
           <ul className="text-sm text-muted-foreground space-y-1">
             <li><code>serviceTypes</code> - Comma-separated service type names (must exist in system)</li>
             <li><code>tags</code> - Comma-separated tag names (must exist in system)</li>
+            <li><code>commissionRate</code> - Commission rate for all service types (e.g., 0.15 for 15%)</li>
             <li><code>notes</code> - Additional notes about the vendor</li>
           </ul>
           <p className="text-sm text-muted-foreground mt-2">
