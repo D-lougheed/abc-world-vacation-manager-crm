@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { UserRole } from "@/types";
 import RoleBasedComponent from "@/components/RoleBasedComponent";
-import BookingsMapChart from "@/components/charts/BookingsMapChart";
+import SimpleBookingsChart from "@/components/charts/SimpleBookingsChart";
 
 const GraphsPage = () => {
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ const GraphsPage = () => {
             <CardTitle>Bookings by Country</CardTitle>
           </CardHeader>
           <CardContent>
-            <BookingsMapChart />
+            <SimpleBookingsChart />
           </CardContent>
         </Card>
       </div>

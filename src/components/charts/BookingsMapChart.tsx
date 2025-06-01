@@ -2,30 +2,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import * as Highcharts from 'highcharts';
-import HighchartsMap from 'highcharts/modules/map';
 
-// Initialize the map module
-HighchartsMap(Highcharts);
-
-interface CountryBookingData {
-  country: string;
-  count: number;
-  'hc-key': string;
-}
-
+// Import Highcharts but don't initialize map module yet
 const BookingsMapChart = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchBookingsData = async () => {
+    const initializeChart = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+
+        // Dynamically import Highcharts to avoid SSR issues
+        const Highcharts = await import('highcharts');
+        const HighchartsMap = await import('highcharts/modules/map');
         
+        // Initialize the map module
+        HighchartsMap.default(Highcharts.default);
+
         // Fetch bookings with location tags
-        const { data: bookings, error } = await supabase
+        const { data: bookings, error: bookingsError } = await supabase
           .from('bookings')
           .select(`
             id,
@@ -35,31 +34,42 @@ const BookingsMapChart = () => {
             )
           `);
 
-        if (error) throw error;
+        if (bookingsError) {
+          console.error('Supabase error:', bookingsError);
+          throw new Error('Failed to fetch bookings data');
+        }
 
         // Count bookings by country
         const countryMap = new Map<string, number>();
         
-        bookings?.forEach(booking => {
-          if (booking.location_tags?.country) {
-            const country = booking.location_tags.country;
-            countryMap.set(country, (countryMap.get(country) || 0) + 1);
-          }
-        });
+        if (bookings) {
+          bookings.forEach(booking => {
+            if (booking.location_tags?.country) {
+              const country = booking.location_tags.country;
+              countryMap.set(country, (countryMap.get(country) || 0) + 1);
+            }
+          });
+        }
 
         // Convert to format suitable for Highcharts
-        const mapData: CountryBookingData[] = Array.from(countryMap.entries()).map(([country, count]) => ({
-          country,
-          count,
-          'hc-key': country.toLowerCase().replace(/\s+/g, '-')
+        const mapData = Array.from(countryMap.entries()).map(([country, count]) => ({
+          'hc-key': country.toLowerCase().replace(/\s+/g, '-'),
+          value: count,
+          name: country
         }));
 
+        console.log('Map data:', mapData);
+
         // Load world map topology
-        const topology = await fetch('https://code.highcharts.com/mapdata/custom/world.topo.json').then(res => res.json());
+        const topologyResponse = await fetch('https://code.highcharts.com/mapdata/custom/world.topo.json');
+        if (!topologyResponse.ok) {
+          throw new Error('Failed to load map topology');
+        }
+        const topology = await topologyResponse.json();
 
         // Create the chart
         if (chartRef.current) {
-          Highcharts.mapChart(chartRef.current, {
+          Highcharts.default.mapChart(chartRef.current, {
             chart: {
               map: topology,
               height: 600
@@ -87,11 +97,7 @@ const BookingsMapChart = () => {
             series: [{
               type: 'map',
               name: 'Bookings',
-              data: mapData.map(item => ({
-                'hc-key': item['hc-key'],
-                value: item.count,
-                name: item.country
-              })),
+              data: mapData,
               dataLabels: {
                 enabled: true,
                 format: '{point.name}'
@@ -105,10 +111,11 @@ const BookingsMapChart = () => {
         }
 
       } catch (error: any) {
-        console.error('Error fetching bookings data:', error);
+        console.error('Error initializing chart:', error);
+        setError(error.message || 'Failed to load map chart');
         toast({
           title: "Error",
-          description: "Failed to load bookings data for the map",
+          description: "Failed to load bookings map chart",
           variant: "destructive"
         });
       } finally {
@@ -116,8 +123,19 @@ const BookingsMapChart = () => {
       }
     };
 
-    fetchBookingsData();
+    initializeChart();
   }, [toast]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96 bg-muted/10 rounded-lg">
+        <div className="text-center">
+          <div className="text-lg font-medium text-destructive mb-2">Failed to load chart</div>
+          <div className="text-sm text-muted-foreground">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
