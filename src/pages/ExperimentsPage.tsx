@@ -66,7 +66,7 @@ const ExperimentsPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:bg-muted/50">
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate("/admin/graphs")}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center">
                 <BarChart3 className="mr-2 h-5 w-5 text-primary" />
@@ -78,9 +78,9 @@ const ExperimentsPage = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Create and customize advanced charts and graphs for business insights.
               </p>
-              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between" disabled>
-                <span>Coming Soon</span>
-                <Settings className="h-4 w-4 ml-2" />
+              <Button variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                <span>Explore Analytics</span>
+                <BarChart3 className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>
           </Card>

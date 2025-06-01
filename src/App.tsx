@@ -30,6 +30,7 @@ import BatchEditTagsPage from "./pages/BatchEditTagsPage";
 import LocationTagsPage from "./pages/LocationTagsPage";
 import SystemSettingsPage from "./pages/SystemSettingsPage";
 import ExperimentsPage from "./pages/ExperimentsPage";
+import GraphsPage from "./pages/GraphsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -104,6 +105,7 @@ const App = () => (
               <Route path="/admin/location-tags" element={<LocationTagsPage />} />
               <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
               <Route path="/admin/experiments" element={<ExperimentsPage />} />
+              <Route path="/admin/graphs" element={<GraphsPage />} />
               <Route path="/admin/audit-logs" element={<AdminAuditLogPage />} />
 
               {/* Mass Import Routes */}
